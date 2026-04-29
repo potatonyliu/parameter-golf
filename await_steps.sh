@@ -62,9 +62,12 @@ fi
 LOG="${EXP_DIR}/run.log"
 START_EPOCH=$(date +%s)
 
-# Portable log-mtime helper (BSD stat on macOS, GNU stat on Linux).
+# Portable log-mtime helper (GNU stat on Linux, BSD stat on macOS).
+# Order matters: GNU stat -f means "filesystem info" and writes a multi-line
+# stdout that poisons arithmetic when this output is interpolated into $((..)).
+# So try GNU `-c %Y` first (works on Linux, fails on macOS), then BSD `-f %m`.
 log_mtime() {
-  stat -f %m "$LOG" 2>/dev/null || stat -c %Y "$LOG" 2>/dev/null || echo 0
+  stat -c %Y "$LOG" 2>/dev/null || stat -f %m "$LOG" 2>/dev/null || echo 0
 }
 elapsed() { echo $(( $(date +%s) - START_EPOCH )); }
 

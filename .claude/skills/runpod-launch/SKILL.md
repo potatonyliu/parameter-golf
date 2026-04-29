@@ -23,7 +23,7 @@ Every `ssh ...` command in this skill — pull, preflight, launch, poll, commit 
 [ ] 3. LOCAL   git add experiments/NNNN_<slug>
                git status                              ← verify intended files staged
                git commit -m "queue exp NNNN_<slug>"
-               git push fork autoresearch-ssm
+               git push fork autoresearch-ssm     ← on Mac. On the pod use `git push origin autoresearch-ssm` (different remote name)
 [ ] 4. POD     ssh runpod-tcp 'cd /workspace/parameter-golf-ssm && git pull'
 [ ] 5. POD     ssh runpod-tcp 'cd /workspace/parameter-golf-ssm && source .venv/bin/activate && \
                                ALLOW_NO_TMUX=1 bash scripts/runpod/preflight.sh experiments/NNNN_<slug>'
@@ -47,7 +47,7 @@ Every `ssh ...` command in this skill — pull, preflight, launch, poll, commit 
                                  git add experiments/NNNN_<slug> results.tsv && \
                                  git status && \
                                  git commit -m "exp NNNN_<slug> result" && \
-                                 git push fork autoresearch-ssm'
+                                 git push fork autoresearch-ssm     ← on Mac. On the pod use `git push origin autoresearch-ssm` (different remote name)'
 [ ] 9. LOCAL   git pull   ← results land here; results.tsv row + result.json + env.sh
 ```
 
@@ -58,7 +58,7 @@ Every `ssh ...` command in this skill — pull, preflight, launch, poll, commit 
 **One-time pod setup the FIRST time you push from a fresh pod** (handled by `setup_pod.sh`'s identity + credential-helper config, but you'll still hit it once for the PAT):
 
 ```bash
-# On the pod, the first `git push fork autoresearch-ssm` prompts for credentials.
+# On the pod, the first `git push origin autoresearch-ssm` prompts for credentials.
 # Generate a fine-grained PAT at https://github.com/settings/tokens?type=beta:
 #   - Repo access: only the fork repo (e.g. potatonyliu/parameter-golf)
 #   - Permissions: Contents:Write, Metadata:Read
