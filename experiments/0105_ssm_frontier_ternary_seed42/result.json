@@ -1,0 +1,9 @@
+{
+  "id": "0105_ssm_frontier_ternary_seed42",
+  "parent": "0102_ssm_frontier_ternary_cuda_2k",
+  "created_at": "2026-04-29T16:44:15Z",
+  "metrics": null,
+  "flags": {},
+  "status": null,
+  "description": null
+}
