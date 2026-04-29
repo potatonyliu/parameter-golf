@@ -18,6 +18,7 @@
 - **Primer is internally inconsistent**: main body argues SSM is "almost certainly wrong" for parameter golf; the "Another agent's feedback" section disagrees on (a) whether to quantize the SSM, (b) whether BigramHash closes the recall gap. Treat both as research opinions; verify empirically.
 - **MPS reality**: ~5 min/exp for transformer-speed blocks; ~8 min/exp for kill-Mamba-2 sequential; ~25 min for triple-parallel. Mamba-1 sequential scan untested — out of scope. CUDA kernels unavailable.
 - **Tokenizer locked at sp1024**.
+- **2026-04-29 CUDA SESSION HEADLINE [n=1, single-seed]**: SSM frontier (kill-Mamba-2 triple-parallel + brotli) at production batch 131072 × 1000 CUDA steps × canonical LR 0.045 lands at **val_bpb pre-quant 1.4587 (no ternary, cap-busts 21.4 MB)** OR **val_bpb post-quant 1.5417 (with ternary, 5.6 MB submittable)**. Best-submittable so far: 0102 at **1.5417 / 5.6 MB**. Δ vs MPS-200-step SSM frontier (2.0030): -0.46 BPB just from MPS→CUDA + small-batch→production-batch + 200→1000 steps. **Ternary's value is purely cap-saving** (trades +0.082 val for -16 MB cap), NOT a val-improver — recasts prior session's "ternary penalty closes" framing. Records anchor (1.1063 SP1024) is reachable in principle: gap is dominated by training data (we're at 1.3% of fineweb10B; record uses 33%) plus standard-stack ports (parallel residuals, EMA, mini-DR — see `scratch/2026-04-29_record_recipe_analysis.md`).
 
 ## Confirmed-paying axes (durable knowledge, don't re-derive)
 
