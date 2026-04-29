@@ -25,6 +25,13 @@ scratch/
 
 # Curl-on-demand vendoring of upstream SSM repos (see references/INDEX.md)
 references/_external/
+# Local-only research artifacts: agent-curated reading list, vendored paper PDFs,
+# and the local index over them. Vendored Python (mamba_minimal_model.py,
+# selective_scan_ref.py) stays tracked.
+PAPERS.md
+references/INDEX.md
+references/*.pdf
+walks/
 
 # Ephemeral runtime state from the scheduling/loop machinery
 .claude/scheduled_tasks.lock

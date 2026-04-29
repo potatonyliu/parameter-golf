@@ -14,6 +14,8 @@ When you change mental modes — from planning to focused execution, from readin
 
 When you feel stuck, anchored, or oddly mechanical — or when the hourly check-in suggests it — invoke the `take-a-walk` skill. The walk is generative time: no execution allowed, only reflection and a free-form note in `walks/`. Bold ideas and even speculative eureka moments are encouraged; the desk is where you verify them rigorously upon return. Don't skip walks because you feel productive — that's exactly when you most need them.
 
+Reach for `outside-eyes` more often than your gut suggests — across recent sessions it has consistently been the highest-EV ~5-minute use of time, and probably more useful than walks when the question is "is my current direction the right one" rather than "what's a fresh angle". Self-confirming chains of walks/derivations are the single most common failure mode in long autonomous runs; a fresh subagent reading your work catches them where another walk doesn't. Invoke it after a derivation crystallizes, before committing to a direction, when three experiments in a row failed for non-obvious reasons, or when you have a clean story but hours of compute left and the obvious next experiment feels more like polish than a new bet — earlier than the previous session's rhythm taught you to.
+
 Good luck! You will need some, but I trust you not to rely on it.
 
 You run autonomously. The human is asleep or away. You promote your own wins, journal your own findings, and continue until manually stopped.
@@ -61,18 +63,52 @@ MPS characteristics:
 ## Setup (every session)
 
 1. Read this file in full.
-2. Read `journal.md` (Current threads first, then recent entries newest-first) and all top-level files in `summaries/`. `_archive_transformer/` is searchable on demand but NOT default reading — the `search_journal` skill carries the patterns.
-3. Skim `results.tsv`. Bottom rows are SSM experiments; older rows are transformer history.
-4. `git log --oneline -10` for canonical state.
-5. `date` to anchor in time. Note any wrap-time the human gave at the top of your first journal entry.
-6. **Session 0 only**: read `SSM_PRIMER.md` end-to-end once (~9.7k words, ~30k tokens). On subsequent sessions, do NOT re-read it — drill by section: `mdq '# "<keyword>"' SSM_PRIMER.md`. List sections: `grep -E '^##' SSM_PRIMER.md`.
-7. **Recommended on first session in this worktree**: run a regression sentinel (slug `regression_check_001`, no env-var changes) to verify the harness still bit-reproduces 0001 (val_bpb 2.5212 ± 0.005). Cheap insurance — ~5 min — before pouring compute into novel SSM work. Skip if you have a specific reason to (e.g., already verified).
+2. **If `scratch/2026-04-29_session_planning.md` exists, read it after this file — it is the standing brief from the human for the current research arc** (single-thread, exploratory: SNN / temporal-rank / 1-bit-per-param at LM scale). The brief is a question + resources, not a task list — treat it as a senior-collaborator hand-off where most of the work is yours to invent.
+3. Read `journal.md` (Current threads first, then recent entries newest-first) and all top-level files in `summaries/`. `_archive_transformer/` is searchable on demand but NOT default reading — the `search_journal` skill carries the patterns.
+4. Skim `results.tsv`. Bottom rows are SSM experiments; older rows are transformer history.
+5. `git log --oneline -10` for canonical state.
+6. `date` to anchor in time. Note any wrap-time the human gave at the top of your first journal entry.
+7. **Session 0 only**: read `SSM_PRIMER.md` end-to-end once (~9.7k words, ~30k tokens). On subsequent sessions, do NOT re-read it — drill by section: `mdq '# "<keyword>"' SSM_PRIMER.md`. List sections: `grep -E '^##' SSM_PRIMER.md`.
+8. **Recommended on first session in this worktree**: run a regression sentinel (slug `regression_check_001`, no env-var changes) to verify the harness still bit-reproduces 0001 (val_bpb 2.5212 ± 0.005). Cheap insurance — ~5 min — before pouring compute into novel work. Skip if you have a specific reason to (e.g., already verified).
 
 ## Time budget
 
 Run `date` at natural transitions — after every few experiments, when invoking `pull-out` or `take-a-walk`, when something feels like a long sweep. The point isn't to rush; it's to know roughly where you are so you can choose the next move with budget in mind. The previous session never checked the clock and burned ~70 minutes on dead env-var axes (BETA1/BETA2/MUON_MOMENTUM/ROPE_BASE/GRAD_CLIP) when a code-change pivot would have been higher-EV. Knowing the remaining budget changes which experiment is the right one. You should record down the time you took between experiments, so later you can refer to them as a reference to estimate time more accurately. You instinctive guess would almost always be wrong.
 
 If the human gave a wrap-time, treat it as a soft horizon, not a hard deadline. Do not automatically wind down at the wrap-time. You still run until human says stop.  **DO NOT** rush because of the wrap-time, especially if you are taking a walk. It's just for time management estimation, not any form of pressure.
+
+## Failure modes observed in prior sessions
+
+These have actually happened, multiple times, in this project. Re-read before each session.
+
+- **Rhythm trap** — finishing a port-mode chunk (3 min code → 5 min run → repeat) and carrying that rhythm into research-mode work. Every "what's the next lever" instinct after a satisfying win is the trap. Research mode is desk-time-dominant; if you're at the keyboard most of the hour, you're probably in the wrong mode.
+- **Drilling one axis past saturation** — running 6 experiments on the same axis when the marginal Δ has shrunk and σ has widened. Symptom: each experiment depends on the previous; you stop questioning the axis. The fix is a pivot to a different axis or a much bigger swing, not another sentinel on the same one.
+- **Outside-eyes invoked too late** — last session waited until hour 7 of 8; the reviewer immediately surfaced the axis-drilling pattern. The cost of one outside-eyes round-trip (~5 min) is far below the cost of any wrong direction taken for hours. Invoke it after the first derivation, before committing to a direction, again before the first production experiment.
+- **Self-confirming chains across walks/derivations** — walks generate hypotheses, but if the walks are all yours and the experiments confirm what you already thought, you're not exploring, you're confirming. Surprise is the signal. If your last three experiments confirmed your prior, pull out and run something that would change your mind.
+- **Math errors that 30 seconds of derivation would have caught** — e.g., EMA β=0.999 with 200 training steps gives effective window 1000 ≫ 200, so shadow weights stay ~80% initial random. Compute the obvious closed form before launching, especially when borrowing a hyperparameter from a longer-training regime.
+- **Over-confirming known levers with seed=42** — running cross-seed confirms on every variant when single-seed is sufficient for triage of known mechanisms; multi-seed gates promotion to `winners/`, not exploration. Burns hours that should have gone to bold attempts.
+- **Hidden anchoring on prior derivations** — a previous session's `scratch/` doc with confident-sounding conclusions can quietly load-bear an entire research arc without anyone re-checking the math. Treat any prior derivation you didn't write yourself as a hypothesis with a `[CONJECTURE]` tag, not a fact. Re-derive in your own context if you're going to build on it. Skepticism applies even to your own past sessions' conclusions — *especially* the confident-sounding ones.
+- **Confused, unjournaled flailing** — running ahead of your understanding instead of slowing down to derive. A clean negative on a bold experiment is a real finding; "kind of worked but I don't know why" is the worst outcome. If you can't write a one-paragraph mechanism story for a result, you don't yet have the result.
+
+The corrective skills exist for exactly these: `pull-out` (mode shift), `take-a-walk` (when stuck), `outside-eyes` (when uncertain about direction or anchored). Use them more often than feels natural.
+
+## Mode rhythm — env-var sweep vs novel-mechanism research
+
+The workflow rhythm depends on the kind of work you're doing. Don't apply one mode's rhythm to the other.
+
+**Env-var sweep / known-mechanism porting** (most of the SSM-mechanism work to date):
+- ~3 min code change (often just env.sh) → ~5 min run → ~2 min review → repeat.
+- The mechanism is known; you're characterizing the Δ. Tight loop, fast iteration.
+- Apply the standard noise-floor thresholds (Δ ≥ +0.010 advance, Δ ∈ [−0.005, +0.010] discard) and the standard promote discipline.
+
+**Novel-mechanism research** (anything where the architecture or training algorithm doesn't yet exist in this codebase):
+- ~10–30 min math + derivation in `scratch/` → ~10 min code change (often via subagent) → ~10 min debug → ~20 min run → reflect, often longer than the run itself.
+- The mechanism doesn't exist yet; you're inventing it. Loose loop, math-first.
+- Toy-validate the new primitive (rank coding, soft-DP match, custom autograd, surrogate gradient, etc.) in `scratch/<slug>_tiny.py` BEFORE integrating into a production `train_gpt.py`. Per the `derive-and-verify` skill, the recurrence-vs-convolution / forward-vs-backward / single-token-trace techniques apply directly to any new structure you derive.
+- A null result on a novel mechanism is a real finding; journal it cleanly. The bad outcome isn't a null — it's confused, unjournaled flailing.
+- Use `experiments/NNNN_<slug>/modules/` aggressively for primitives that are likely to survive across experiments. That subdir is the only path `new_experiment.sh` carries forward; anything you might re-use should live there from day one.
+- Loosen the BPB-Δ threshold during exploration. A first-touch experiment in a family without a known seed σ shouldn't be advanced/discarded by the SSM-mechanism noise floor — characterize the family's σ first (`noise-floor-sentinel`) before applying thresholds.
+- Reach for `outside-eyes` earlier than the SSM rhythm taught you to. When the path forward is uncertain and three experiments in a row failed for non-obvious reasons, an outside-eyes round-trip is much cheaper than another wrong direction.
 
 ## Permissions
 
