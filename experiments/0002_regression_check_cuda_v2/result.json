@@ -1,0 +1,26 @@
+{
+  "id": "0002_regression_check_cuda_v2",
+  "parent": "canonical",
+  "created_at": "2026-04-29T13:35:52Z",
+  "metrics": {
+    "val_bpb_pre_quant": 2.5041,
+    "val_bpb_post_quant": 2.51151506,
+    "val_loss_pre_quant": 4.2799,
+    "val_loss_post_quant": 4.29250892,
+    "quant_tax": 0.007415,
+    "step_avg_ms": 134.13,
+    "num_steps": 200.0,
+    "artifact_bytes": 6913520.0,
+    "artifact_mb": 6.914,
+    "code_bytes": 50721.0,
+    "compression_ratio": 3.91
+  },
+  "flags": {
+    "crashed": false,
+    "size_violation": false,
+    "has_nan": false,
+    "exit_code": 0
+  },
+  "status": null,
+  "description": null
+}
