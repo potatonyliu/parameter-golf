@@ -2,8 +2,25 @@
   "id": "0106_full_selectivity_prod",
   "parent": "0103_ssm_frontier_cuda_2k",
   "created_at": "2026-04-29T17:15:52Z",
-  "metrics": null,
-  "flags": {},
+  "metrics": {
+    "val_bpb_pre_quant": 3.5428,
+    "val_bpb_post_quant": 3.54340927,
+    "val_loss_pre_quant": 6.0551,
+    "val_loss_post_quant": 6.05615158,
+    "quant_tax": 0.000609,
+    "step_avg_ms": 805.41,
+    "num_steps": 1000.0,
+    "artifact_bytes": 22817772.0,
+    "artifact_mb": 22.818,
+    "code_bytes": 78723.0,
+    "compression_ratio": 3.94
+  },
+  "flags": {
+    "crashed": false,
+    "size_violation": true,
+    "has_nan": false,
+    "exit_code": 0
+  },
   "status": null,
   "description": null
 }
