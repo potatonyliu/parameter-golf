@@ -147,6 +147,26 @@ After the chain-restart issue (initial 0102/0103 OOM at canonical batch 524288 +
 
 **Next**: 0103 (SSM no-ternary at production batch, decomposition control) and 0104 (SSM at 5k steps, training-duration extrapolation) — chain restarted with these two only after 0102 chain post-script crashed on a 'parent' KeyError (due to my earlier `echo "{}"` reset of result.json). Fix: restore result.json with parent field before re-running.
 
+## 2026-04-29 · 0103 result recasts 0102 — ternary's value is purely cap-saving [n=1]
+
+**0103 setup**: identical to 0102 EXCEPT `TERNARY_BODY=0` (the ternary is removed). Same SSM frontier topology, same canonical LR 0.045, same production batch 131072, 1000 steps.
+
+**0103 observed**: pre-quant **1.4587**, post-quant **1.4591**, artifact **21.43 MB (CAP-BUSTS by 5.4 MB)**, step_avg 803 ms.
+
+**Implication**: at production batch + canonical LR, the SSM frontier's TRAINING benefits from the regime, but ternary still costs +0.082 val_bpb pre-quant (1.4587 vs 1.5414). The 0102 result that I called a "compound win" was really the production-batch + canonical-LR effect alone — ternary is a NET COST on val_bpb at this regime.
+
+**HOWEVER**: ternary's value is now precisely characterized as a **cap-saver, not a val-saver**:
+- 0103 (no ternary): val 1.459, artifact 21.4 MB → INELIGIBLE for submission (>16 MB)
+- 0102 (with ternary): val 1.541, artifact 5.6 MB → SUBMITTABLE with 10.4 MB headroom
+- Trade: ternary buys ~16 MB of cap for +0.082 val_bpb cost.
+
+The cleanest framing: **0103 demonstrates the model can land at val_bpb 1.46 at our regime, but at 21.4 MB. To make it submittable WITHOUT ternary we'd shrink the model — at smaller params, val_bpb would rise**. The right next experiment to characterize this: **shrunk-no-ternary at cap = SUBMIT-equivalent SSM frontier**. Likely lands somewhere between 1.46 (full size) and 1.54 (full + ternary).
+
+**Best results so far this session**:
+- Best **val_bpb**: 0103 pre-quant 1.4587 (ineligible: cap-busts 21.4 MB)
+- Best **submittable**: 0102 post-quant 1.5417 at 5.6 MB (single-seed)
+- Best by leaderboard standard: 0102 since cap eligibility is required.
+
 
 
 
