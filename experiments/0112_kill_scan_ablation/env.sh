@@ -93,3 +93,16 @@ export ITERATIONS=1000
 
 # Same OOM correction as 0102.
 export TRAIN_BATCH_TOKENS=131072
+
+# 0112: conv1d-only ablation. Keep conv1d + in_proj + out_proj + D_skip + gate
+# (and B/C/dt/A_log params allocated but unused), but skip the SSD scan: set
+# y = silu(x_conv) directly instead of running the recurrence. Isolates whether
+# the "SSM contribution" we measure at production scale (-0.011 BPB vs pure-attn
+# from 0109) is conv1d-shaped or scan-shaped. Subagent code change adds the
+# MAMBA2_KILL_SCAN=1 branch in Mamba2Block.forward (mirrors existing
+# MAMBA2_KILL_SELECTIVITY=1 pattern).
+export MAMBA2_KILL_SCAN=1
+
+# Pod preflight requires non-zero wallclock. ~13-15 min train at predicted
+# 700 ms/step (faster than 0103's 803 ms because no scan).
+export MAX_WALLCLOCK_SECONDS=1500

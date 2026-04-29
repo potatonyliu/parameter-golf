@@ -955,6 +955,15 @@ class Mamba2Block(nn.Module):
             # dt: only dt_bias contributes (no per-token dt projection).
             # No new param needed — dt_bias is reused.
 
+        # 0112: scan-kill ablation. When MAMBA2_KILL_SCAN=1, bypass the SSD
+        # scan computation entirely and treat silu(conv1d(x_branch)) as the
+        # scan output. B/C/A_log/dt_bias remain allocated (unused) so the
+        # parameter count matches the full kill-Mamba-2 block — this isolates
+        # "what does the scan COMPUTATION contribute" from "what do the scan
+        # PARAMETERS contribute" (the latter is a follow-up). Default 0 keeps
+        # the path byte-identical to 0103.
+        self._kill_scan = os.environ.get("MAMBA2_KILL_SCAN", "0") == "1"
+
     def forward(self, x: Tensor) -> Tensor:
         b, l, _ = x.shape
         if l % self.chunk_size != 0:
@@ -986,29 +995,36 @@ class Mamba2Block(nn.Module):
         x_conv = x_conv.transpose(1, 2).contiguous()  # (b, l, d_inner)
         x_act = F.silu(x_conv)
 
-        # Reshape x_act to per-head (b, l, nheads, headdim).
-        x_h = x_act.reshape(b, l, self.nheads, self.headdim)
+        if self._kill_scan:
+            # 0112 scan-kill: skip the entire SSD scan path. Treat the
+            # post-silu conv1d output as the "y" that would have come out
+            # of the scan. B_in/C_in/dt/A_log are computed/allocated but
+            # unused so the parameter count matches the full block.
+            y = x_act.float()  # (b, l, d_inner) — fp32 to match scan output
+        else:
+            # Reshape x_act to per-head (b, l, nheads, headdim).
+            x_h = x_act.reshape(b, l, self.nheads, self.headdim)
 
-        # Compute (dt, A) for SSD. dt = softplus(dt_in + dt_bias);
-        # A = -exp(A_log).
-        dt_f = F.softplus(dt.float() + self.dt_bias.float())  # (b, l, nheads)
-        A_f = -torch.exp(self.A_log.float())  # (nheads,)
+            # Compute (dt, A) for SSD. dt = softplus(dt_in + dt_bias);
+            # A = -exp(A_log).
+            dt_f = F.softplus(dt.float() + self.dt_bias.float())  # (b, l, nheads)
+            A_f = -torch.exp(self.A_log.float())  # (nheads,)
 
-        # Discretize: SSD reference takes X*=dt and A*=dt as inputs. Applied
-        # in fp32 throughout for stability.
-        X_disc = x_h.float() * dt_f.unsqueeze(-1)  # (b, l, nheads, headdim)
-        A_disc = A_f[None, None, :] * dt_f  # (b, l, nheads)
+            # Discretize: SSD reference takes X*=dt and A*=dt as inputs. Applied
+            # in fp32 throughout for stability.
+            X_disc = x_h.float() * dt_f.unsqueeze(-1)  # (b, l, nheads, headdim)
+            A_disc = A_f[None, None, :] * dt_f  # (b, l, nheads)
 
-        # B and C are shared across heads (ngroups=1) so we broadcast a
-        # singleton head axis.
-        B_b = B_in.float().unsqueeze(2).expand(b, l, self.nheads, self.d_state)
-        C_b = C_in.float().unsqueeze(2).expand(b, l, self.nheads, self.d_state)
+            # B and C are shared across heads (ngroups=1) so we broadcast a
+            # singleton head axis.
+            B_b = B_in.float().unsqueeze(2).expand(b, l, self.nheads, self.d_state)
+            C_b = C_in.float().unsqueeze(2).expand(b, l, self.nheads, self.d_state)
 
-        Y, _ = ssd_minimal_discrete(
-            X_disc, A_disc, B_b, C_b, block_len=self.chunk_size
-        )  # (b, l, nheads, headdim) fp32
+            Y, _ = ssd_minimal_discrete(
+                X_disc, A_disc, B_b, C_b, block_len=self.chunk_size
+            )  # (b, l, nheads, headdim) fp32
 
-        y = Y.reshape(b, l, self.d_inner)
+            y = Y.reshape(b, l, self.d_inner)
 
         # D skip + gate. y, x_act, z all currently in fp32 / in_dtype mix;
         # do the gate in fp32 then cast back.
