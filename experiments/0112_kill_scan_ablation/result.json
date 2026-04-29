@@ -1,0 +1,9 @@
+{
+  "id": "0112_kill_scan_ablation",
+  "parent": "0103_ssm_frontier_cuda_2k",
+  "created_at": "2026-04-29T20:27:39Z",
+  "metrics": null,
+  "flags": {},
+  "status": null,
+  "description": null
+}

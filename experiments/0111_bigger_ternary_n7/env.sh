@@ -1,5 +1,5 @@
 # Source this from inside the experiment folder before running.
-export RUN_ID="0110_bigger_ternary_seed2024"
+export RUN_ID="0111_bigger_ternary_n7"
 export DATA_PATH="../../data/datasets/fineweb10B_sp1024"
 export TOKENIZER_PATH="../../data/tokenizers/fineweb_1024_bpe.model"
 export VOCAB_SIZE=1024
@@ -174,11 +174,12 @@ export NUM_UNIQUE_LAYERS=5
 # 0,1,2 covering 3 unique blocks; now we have 5).
 export PARALLEL_LAYER_POSITIONS=0,1,2,3,4
 
-# 0110: SEED=2024 — third seed for noise-floor-sentinel on the bigger-ternary-SSM family.
-# Sibling of 0107 (SEED=1337, val 1.5256) and 0108 (SEED=42, val 1.5208).
-# Same recipe; only SEED differs. Completes the 3-seed sigma characterization that gates
-# the promote of 0107/0108-like winners (per `noise-floor-sentinel` skill hard-rule).
-export SEED=2024
-
-# Pod preflight requires non-zero wallclock. ~22 min train (1000 x 1.34 s) + eval.
-export MAX_WALLCLOCK_SECONDS=1800
+# 0111: cap-frontier push. NUM_UNIQUE_LAYERS=7 (vs 0107's 5). Linear extrapolation
+# from 0102 (n=3, 5.63 MB) and 0107 (n=5, 9.08 MB): per-layer +1.725 MB ternary;
+# n=7 predicts ~12.5 MB (3.5 MB headroom under 16 MB cap). Step time predicted
+# ~1880 ms (per-layer +266 ms; 0107=1345 ms); 1000 steps = ~31 min wallclock.
+# Question: does depth keep paying back at production scale? 0102->0107 was -0.023
+# BPB for +2 layers; if linear, n=7 lands ~1.50; if diminishing, ~1.51.
+export NUM_UNIQUE_LAYERS=7
+export PARALLEL_LAYER_POSITIONS=0,1,2,3,4,5,6
+export MAX_WALLCLOCK_SECONDS=2400
