@@ -46,7 +46,8 @@ set -euo pipefail
 BRANCH=$(git -C "${CLAUDE_PROJECT_DIR:-.}" branch --show-current 2>/dev/null || echo "")
 [[ "$BRANCH" == autoresearch-* ]] || exit 0
 
-# Gate 3: skip while an experiment is in flight. We match three layers:
+# Gate 3: skip while an experiment is in flight. We match three layers
+# of LOCAL processes (Mac, when running MPS smokes):
 #   - python … train_gpt.py     → the ~5 min training process (bulk of wallclock)
 #   - run_experiment.sh         → ~1 s setup before python, plus post-python
 #                                 metrics extraction / results.tsv append
@@ -54,6 +55,24 @@ BRANCH=$(git -C "${CLAUDE_PROJECT_DIR:-.}" branch --show-current 2>/dev/null || 
 # Any one of these alive means the agent is legitimately mid-experiment and
 # may end a turn to await completion — nudging here would loop forever.
 if pgrep -f '(python[^[:space:]]* train_gpt\.py|run_experiment\.sh|await_steps\.sh)' >/dev/null 2>&1; then
+  exit 0
+fi
+
+# When training is on a paid CUDA pod (RunPod), the local Mac has no
+# train_gpt.py — the work is remote. The local-side signature is one or
+# more `ssh runpod-tcp …` processes (Monitor with `tail -F`, or a Bash
+# background task running `until grep -q "ALL DONE"; do sleep…`). Any
+# active SSH to the pod means the agent is awaiting pod-side work; the
+# nudge would loop here too.
+if pgrep -f 'ssh[^[:space:]]* runpod[^[:space:]-]*' >/dev/null 2>&1; then
+  exit 0
+fi
+# Belt-and-suspenders: definitive pod-side check via short-timeout SSH.
+# Catches the case where no local SSH multiplex is open right now (e.g.
+# a `until grep …; do sleep 10; done` between sleeps) but the pod is in
+# fact still training. ConnectTimeout=2 keeps the hook fast (<2s) on
+# pod-down case. BatchMode=yes prevents prompts.
+if ssh -o ConnectTimeout=2 -o BatchMode=yes runpod-tcp 'pgrep -f train_gpt\.py >/dev/null 2>&1' 2>/dev/null; then
   exit 0
 fi
 
