@@ -1,9 +1,24 @@
 {
+  "metrics": {
+    "val_bpb_pre_quant": 1.5414,
+    "val_bpb_post_quant": 1.54173951,
+    "val_loss_pre_quant": 2.6344,
+    "val_loss_post_quant": 2.63503521,
+    "quant_tax": 0.00034,
+    "step_avg_ms": 813.57,
+    "num_steps": 1000.0,
+    "artifact_bytes": 5629134.0,
+    "artifact_mb": 5.629,
+    "code_bytes": 101616.0,
+    "compression_ratio": 7.46
+  },
+  "flags": {
+    "crashed": false,
+    "size_violation": false,
+    "has_nan": false,
+    "exit_code": 0
+  },
   "id": "0102_ssm_frontier_ternary_cuda_2k",
   "parent": "0099_ternary_extended_cuda_2k",
-  "created_at": "2026-04-29T15:44:55Z",
-  "metrics": null,
-  "flags": {},
-  "status": null,
-  "description": null
+  "created_at": "2026-04-29T16:25:42Z"
 }
