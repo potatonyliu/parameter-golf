@@ -2,8 +2,25 @@
   "id": "0105_ssm_frontier_ternary_seed42",
   "parent": "0102_ssm_frontier_ternary_cuda_2k",
   "created_at": "2026-04-29T16:44:15Z",
-  "metrics": null,
-  "flags": {},
+  "metrics": {
+    "val_bpb_pre_quant": 1.5499,
+    "val_bpb_post_quant": 1.55065707,
+    "val_loss_pre_quant": 2.649,
+    "val_loss_post_quant": 2.65027649,
+    "quant_tax": 0.000757,
+    "step_avg_ms": 718.83,
+    "num_steps": 1000.0,
+    "artifact_bytes": 5520479.0,
+    "artifact_mb": 5.52,
+    "code_bytes": 101616.0,
+    "compression_ratio": 7.46
+  },
+  "flags": {
+    "crashed": false,
+    "size_violation": false,
+    "has_nan": false,
+    "exit_code": 0
+  },
   "status": null,
   "description": null
 }
