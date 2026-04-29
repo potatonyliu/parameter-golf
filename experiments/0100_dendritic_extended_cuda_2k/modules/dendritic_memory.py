@@ -222,12 +222,13 @@ class DendriticMemory(nn.Module):
         matched_keys = self.pattern_keys[idx]
         match_mask = matched_keys == flat_keys  # (B*L_keys,) bool
 
-        n_matched = int(match_mask.sum().item())
-        if n_matched == 0:
-            return out
-
+        # Original early-return `if n_matched == 0: return out` used .item()
+        # which breaks torch.compile(fullgraph=True). The downstream gather/
+        # scatter ops handle the empty-mask case correctly (empty index tensors
+        # → zero-element gathers → no-op scatters), so removing the guard is
+        # numerically equivalent for non-empty mask and a tiny cost for empty.
         # Gather content for matched positions, project, scatter into out.
-        # `idx[match_mask]` gives the dendrite indices (long, shape (n_matched,)).
+        # `idx[match_mask]` gives the dendrite indices.
         match_dendrite_idx = idx[match_mask]                    # (n_matched,) long
         gathered = self.content.index_select(0, match_dendrite_idx)  # (n_matched, d_content)
         # Project up to d_model. Cast proj.weight to gathered.dtype to keep
