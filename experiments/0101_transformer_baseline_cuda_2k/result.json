@@ -1,0 +1,9 @@
+{
+  "id": "0101_transformer_baseline_cuda_2k",
+  "parent": "0076_confidence_gated_blend",
+  "created_at": "2026-04-29T15:15:21Z",
+  "metrics": null,
+  "flags": {},
+  "status": null,
+  "description": null
+}
