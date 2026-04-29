@@ -2,8 +2,25 @@
   "id": "0113_full_sel_rescue_lr_third",
   "parent": "0103_ssm_frontier_cuda_2k",
   "created_at": "2026-04-29T20:35:40Z",
-  "metrics": null,
-  "flags": {},
+  "metrics": {
+    "val_bpb_pre_quant": 1.4882,
+    "val_bpb_post_quant": 1.48983433,
+    "val_loss_pre_quant": 2.5435,
+    "val_loss_post_quant": 2.54632244,
+    "quant_tax": 0.001634,
+    "step_avg_ms": 713.54,
+    "num_steps": 1000.0,
+    "artifact_bytes": 17648689.0,
+    "artifact_mb": 17.649,
+    "code_bytes": 78723.0,
+    "compression_ratio": 3.94
+  },
+  "flags": {
+    "crashed": false,
+    "size_violation": true,
+    "has_nan": false,
+    "exit_code": 0
+  },
   "status": null,
   "description": null
 }
