@@ -7,6 +7,14 @@ description: Invoke at the start of any session running on a RunPod pod, and bef
 
 You operate **from your Mac via SSH** on a paid pod. The pod bills per second; idle minutes are real money. **Only Tony stops pods** — you suggest, he acts. Never run anything that controls pod lifecycle (deploy/stop/terminate/billing).
 
+## SSH host: USE `runpod-tcp`, NOT `runpod` (mandatory for the agent)
+
+`~/.ssh/config` defines two hosts:
+- `runpod` — proxies through `ssh.runpod.io` with `RequestTTY yes`. Allocates a PTY. **Fails from agent Bash** (non-interactive, no TTY) with `Error: Your SSH client doesn't support PTY`. Use this only from a human terminal.
+- `runpod-tcp` — direct TCP to the pod's exposed port, no PTY required. **This is what the agent uses, every time.**
+
+Every `ssh ...` command in this skill — pull, preflight, launch, poll, commit — is `ssh runpod-tcp ...`. If a command is failing with the PTY error, you're using the wrong host; switch.
+
 ## Workflow — every experiment, every time
 
 ```
@@ -16,30 +24,30 @@ You operate **from your Mac via SSH** on a paid pod. The pod bills per second; i
                git status                              ← verify intended files staged
                git commit -m "queue exp NNNN_<slug>"
                git push fork autoresearch-ssm
-[ ] 4. POD     ssh runpod 'cd /workspace/parameter-golf-ssm && git pull'
-[ ] 5. POD     ssh runpod 'cd /workspace/parameter-golf-ssm && source .venv/bin/activate && \
-                           ALLOW_NO_TMUX=1 bash scripts/runpod/preflight.sh experiments/NNNN_<slug>'
+[ ] 4. POD     ssh runpod-tcp 'cd /workspace/parameter-golf-ssm && git pull'
+[ ] 5. POD     ssh runpod-tcp 'cd /workspace/parameter-golf-ssm && source .venv/bin/activate && \
+                               ALLOW_NO_TMUX=1 bash scripts/runpod/preflight.sh experiments/NNNN_<slug>'
                                                   ↑ override the tmux check: when you launch
-                                                    from `ssh runpod` you're not IN tmux, but
+                                                    from `ssh runpod-tcp` you're not IN tmux, but
                                                     step 6 puts the run INTO a detached tmux,
                                                     so the safety the check is for is met.
 [ ] 6. POD     launch via tmux (detached so SSH disconnect is safe):
        single GPU:
-         ssh runpod 'cd /workspace/parameter-golf-ssm/experiments/NNNN_<slug> && \
-                     tmux new -d -s expNNNN \
-                     "source ../../.venv/bin/activate && ../../run_experiment.sh"'
+         ssh runpod-tcp 'cd /workspace/parameter-golf-ssm/experiments/NNNN_<slug> && \
+                         tmux new -d -s expNNNN \
+                         "source ../../.venv/bin/activate && ../../run_experiment.sh"'
        8×H100:
-         ssh runpod 'cd /workspace/parameter-golf-ssm && source .venv/bin/activate && \
-                     tmux new -d -s expNNNN \
-                     "bash scripts/runpod/launch_h100.sh experiments/NNNN_<slug>"'
+         ssh runpod-tcp 'cd /workspace/parameter-golf-ssm && source .venv/bin/activate && \
+                         tmux new -d -s expNNNN \
+                         "bash scripts/runpod/launch_h100.sh experiments/NNNN_<slug>"'
 [ ] 7. POD     poll, no faster than once per ~30s:
-                 ssh runpod 'tmux capture-pane -t expNNNN -p | tail -20'
+                 ssh runpod-tcp 'tmux capture-pane -t expNNNN -p | tail -20'
 [ ] 8. POD     on completion, commit results FROM the pod:
-                 ssh runpod 'cd /workspace/parameter-golf-ssm && \
-                             git add experiments/NNNN_<slug> results.tsv && \
-                             git status && \
-                             git commit -m "exp NNNN_<slug> result" && \
-                             git push fork autoresearch-ssm'
+                 ssh runpod-tcp 'cd /workspace/parameter-golf-ssm && \
+                                 git add experiments/NNNN_<slug> results.tsv && \
+                                 git status && \
+                                 git commit -m "exp NNNN_<slug> result" && \
+                                 git push fork autoresearch-ssm'
 [ ] 9. LOCAL   git pull   ← results land here; results.tsv row + result.json + env.sh
 ```
 
@@ -98,7 +106,7 @@ If the next experiment depends on N's outcome, draft 2–3 conditional next-step
 - Two consecutive crashes from the same root cause
 - `artifact_mb > 16.0` (submission-illegal)
 - NaN / Inf in val_loss
-- `ssh runpod` hangs or refuses (pod stopped or networking)
+- `ssh runpod-tcp` hangs or refuses (pod stopped or networking)
 - Step time 3× the prediction (kernel path wrong)
 
 ## Failure modes — flag, don't retry blindly
@@ -112,10 +120,10 @@ If the next experiment depends on N's outcome, draft 2–3 conditional next-step
 ## Wrap before disconnecting
 
 ```
-[ ] ssh runpod 'tmux ls'                  — confirm nothing still running
-[ ] ssh runpod 'nvidia-smi'               — GPU idle
-[ ] ssh runpod 'cd /workspace/parameter-golf-ssm && git status && git log --oneline -3'
-                                          — everything committed and pushed
+[ ] ssh runpod-tcp 'tmux ls'                  — confirm nothing still running
+[ ] ssh runpod-tcp 'nvidia-smi'               — GPU idle
+[ ] ssh runpod-tcp 'cd /workspace/parameter-golf-ssm && git status && git log --oneline -3'
+                                              — everything committed and pushed
 [ ] tell Tony explicitly: "Done. Pod is idle, you can stop it."
 ```
 

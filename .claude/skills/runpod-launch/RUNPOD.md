@@ -65,14 +65,24 @@ Stop ≠ Terminate. Stop preserves the volume disk. Terminate deletes everything
 6. **Add to `~/.ssh/config`** (so the agent and you have a single name to use):
 
    ```
+   # ssh.runpod.io proxy host (no PTY allocation in non-interactive mode — DO NOT use from agent Bash)
    Host runpod
+       HostName ssh.runpod.io
+       User <runpod-pod-id>-<8-char-suffix>
+       IdentityFile ~/.ssh/id_ed25519
+       RequestTTY yes
+
+   # Direct TCP (THIS is what the agent uses from Bash — no PTY required)
+   Host runpod-tcp
        HostName <pod-ip>
        Port <pod-port>
        User root
        IdentityFile ~/.ssh/id_ed25519
    ```
 
-7. **First connection:** `ssh runpod`, accept host key, you should land in `/workspace`.
+   **The agent must use `ssh runpod-tcp` from Bash, NOT `ssh runpod`.** Reason: `Host runpod` goes through ssh.runpod.io which forces PTY allocation; agent Bash is non-interactive (no TTY) so every command fails with "Your SSH client doesn't support PTY". `runpod-tcp` connects directly to the pod's exposed TCP port and works headless. (Throughout this manual and SKILL.md, every `ssh runpod` example is the agent-equivalent `ssh runpod-tcp`.)
+
+7. **First connection:** `ssh runpod-tcp`, accept host key, you should land in `/root` or `/workspace`.
 
 ---
 
