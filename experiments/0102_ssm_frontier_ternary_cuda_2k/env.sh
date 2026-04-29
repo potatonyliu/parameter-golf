@@ -151,3 +151,7 @@ export ITERATIONS=2000
 # just the screening regime. Step time: ~1-2s/step expected at canonical batch on 5090.
 export TRAIN_BATCH_TOKENS=524288
 export MATRIX_LR=0.045
+
+# Override ITERATIONS down to 1000 since at canonical batch each step sees 21x more
+# tokens. 1000 × 524288 = 524M tokens trained, still 10x more than 0099's 49M tokens.
+export ITERATIONS=1000

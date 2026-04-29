@@ -87,3 +87,6 @@ export ITERATIONS=2000
 # like deployment, and val_bpb should land much closer to the 1.10 H100 record.
 export TRAIN_BATCH_TOKENS=524288
 export MATRIX_LR=0.045
+
+# Same — reduce iterations since canonical batch sees 21x more tokens per step.
+export ITERATIONS=1000
