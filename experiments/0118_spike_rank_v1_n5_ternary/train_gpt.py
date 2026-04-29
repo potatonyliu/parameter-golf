@@ -205,6 +205,15 @@ class Hyperparameters:
     # gate disabled, byte-identical to parent 0074.
     conf_gate_threshold = float(os.environ.get("CONF_GATE_THRESHOLD", -1e9))
 
+    # 0118 spike-rank embedding v1 (variant A, sparse-only). When
+    # SPIKE_RANK_EMBED=0 (default), token embedding + tied lm_head use the
+    # standard nn.Embedding + F.linear(x, tok_emb.weight) path — byte-identical
+    # to parent 0107. When =1, replace tok_emb with a SpikeRankEmbed module
+    # that stores K nonzero values per row via top-K STE; lm_head reuses the
+    # same sparse matrix.
+    spike_rank_embed = int(os.environ.get("SPIKE_RANK_EMBED", "0"))
+    spike_rank_k = int(os.environ.get("SPIKE_RANK_K", "8"))
+
 # -----------------------------
 # MUON OPTIMIZER
 # -----------------------------
@@ -1312,6 +1321,8 @@ class GPT(nn.Module):
         parallel_layer_positions: set[int] = None,
         bigram_vocab_size: int = 0,
         bigram_dim: int = 64,
+        spike_rank_embed: int = 0,
+        spike_rank_k: int = 8,
     ):
         super().__init__()
         attn_positions = attn_layer_positions or set()
@@ -1340,7 +1351,20 @@ class GPT(nn.Module):
         self.tie_embeddings = tie_embeddings
         self.tied_embed_init_std = tied_embed_init_std
         self.logit_softcap = logit_softcap
-        self.tok_emb = nn.Embedding(vocab_size, model_dim)
+        # 0118 spike-rank embedding (variant A): when spike_rank_embed=1,
+        # replace nn.Embedding + tied F.linear path with a single SpikeRankEmbed
+        # module storing K nonzero values per row via top-K STE. Default
+        # spike_rank_embed=0 keeps the standard nn.Embedding path byte-identical
+        # to parent 0107.
+        self.spike_rank_embed = spike_rank_embed
+        self.spike_rank_k = spike_rank_k
+        if spike_rank_embed == 1:
+            from modules.spike_rank_embed import SpikeRankEmbed
+            self._spike_embed = SpikeRankEmbed(vocab_size, model_dim, spike_rank_k)
+            self.tok_emb = None  # not used; route through _spike_embed
+        else:
+            self._spike_embed = None
+            self.tok_emb = nn.Embedding(vocab_size, model_dim)
         if bigram_vocab_size > 0:
             self.bigram_hash = BigramHashEmbedding(bigram_vocab_size, bigram_dim, model_dim)
         else:
@@ -1411,14 +1435,19 @@ class GPT(nn.Module):
         self._init_weights()
 
     def _init_weights(self) -> None:
-        if self.tie_embeddings:
+        if self.tie_embeddings and self.tok_emb is not None:
+            # SpikeRankEmbed sets its own init scale (0.05) inside its __init__,
+            # matching TIED_EMBED_INIT_STD; skip the re-init when routing through it.
             nn.init.normal_(self.tok_emb.weight, mean=0.0, std=self.tied_embed_init_std)
         for module in self.modules():
             if isinstance(module, nn.Linear) and getattr(module, "_zero_init", False):
                 nn.init.zeros_(module.weight)
 
     def forward(self, input_ids: Tensor, target_ids: Tensor) -> Tensor:
-        x = self.tok_emb(input_ids)
+        if self.spike_rank_embed == 1:
+            x = self._spike_embed(input_ids)
+        else:
+            x = self.tok_emb(input_ids)
         if self.bigram_hash is not None:
             x = x + self.bigram_hash(input_ids)
         x = F.rms_norm(x, (x.size(-1),))
@@ -1446,7 +1475,10 @@ class GPT(nn.Module):
             x_flat = x_norm.reshape(-1, x_norm.size(-1))
             targets = target_ids.reshape(-1)
             if self.tie_embeddings:
-                logits_proj = F.linear(x_flat, self.tok_emb.weight)
+                if self.spike_rank_embed == 1:
+                    logits_proj = self._spike_embed.lm_head(x_flat)
+                else:
+                    logits_proj = F.linear(x_flat, self.tok_emb.weight)
             else:
                 if self.lm_head is None:
                     raise RuntimeError("lm_head is required when tie_embeddings=False")
@@ -1457,7 +1489,10 @@ class GPT(nn.Module):
         # Trigram-blended path. We need (B, L, V) logits to blend with trigram
         # log-probs that depend on input positions, so do not flatten.
         if self.tie_embeddings:
-            logits_proj = F.linear(x_norm, self.tok_emb.weight)
+            if self.spike_rank_embed == 1:
+                logits_proj = self._spike_embed.lm_head(x_norm)
+            else:
+                logits_proj = F.linear(x_norm, self.tok_emb.weight)
         else:
             if self.lm_head is None:
                 raise RuntimeError("lm_head is required when tie_embeddings=False")
@@ -1685,6 +1720,8 @@ def main() -> None:
         parallel_layer_positions=parallel_layer_positions,
         bigram_vocab_size=args.bigram_vocab_size,
         bigram_dim=args.bigram_dim,
+        spike_rank_embed=args.spike_rank_embed,
+        spike_rank_k=args.spike_rank_k,
     ).to(device).bfloat16()
     for module in base_model.modules():
         if isinstance(module, CastedLinear):
@@ -1728,8 +1765,15 @@ def main() -> None:
             else:
                 scalar_params.append(p)
     token_lr = args.tied_embed_lr if args.tie_embeddings else args.embed_lr
+    # 0118 spike-rank embedding: when SPIKE_RANK_EMBED=1, the token-level param
+    # lives inside _spike_embed.weight (tok_emb is None). Route Adam to it with
+    # the same LR group otherwise unchanged.
+    if base_model.tok_emb is not None:
+        token_param = base_model.tok_emb.weight
+    else:
+        token_param = base_model._spike_embed.weight
     optimizer_tok = torch.optim.Adam(
-        [{"params": [base_model.tok_emb.weight], "lr": token_lr, "base_lr": token_lr}],
+        [{"params": [token_param], "lr": token_lr, "base_lr": token_lr}],
         betas=(args.beta1, args.beta2),
         eps=args.adam_eps,
         fused=(device_type == "cuda"),

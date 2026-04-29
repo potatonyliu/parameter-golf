@@ -170,3 +170,9 @@ For more cap savings, the v1.5 follow-up could store ONLY the K nonzero indices 
 - step_avg drift > 1.5x parent: F.linear through K-sparse weight is slower than dense matmul. Investigate.
 
 ## Notes from execution
+
+- Created `modules/spike_rank_embed.py` (TopKSTE + SpikeRankEmbed, init scale 0.05).
+- Hyperparameters fields `spike_rank_embed` / `spike_rank_k` added at train_gpt.py:215-216 (right after `conf_gate_threshold`, mirroring 0117's dendrocentric placement).
+- Embed class is `tok_emb` (NOT `embed`). The codebase uses tied embeddings via `F.linear(x, self.tok_emb.weight)` — there is NO `self.lm_head(x)` call when `tie_embeddings=1` (the canonical case here): `self.lm_head` is set to None and the projection is the F.linear call. Found 1 lookup site (forward, `x = self.tok_emb(input_ids)`) and 2 F.linear sites (non-trigram path + trigram-blended path).
+- Branched on `self.spike_rank_embed == 1` at: GPT.__init__ construction, `_init_weights` (added `and self.tok_emb is not None`), forward lookup, both F.linear sites, GPT instantiation in main, and the Adam token-LR optimizer at line ~1771. When =1, set `self.tok_emb = None` and `self._spike_embed = SpikeRankEmbed(...)`; when =0, set `self._spike_embed = None` and keep the original `nn.Embedding`. This keeps `named_parameters()` from double-counting and preserves byte-identity with 0107 along the default path. Diff against 0107 is purely additive/gated — no original lines mutated except guarded with `is not None` checks.
+- Deviation from plan wording: plan referred to `self.embed`/`self.lm_head` as the canonical names; this codebase uses `self.tok_emb` and a tied-via-`F.linear` lm_head pattern. Followed the existing pattern, applying the gating at the actual call sites.
