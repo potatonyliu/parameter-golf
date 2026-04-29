@@ -1,0 +1,9 @@
+{
+  "id": "0106_full_selectivity_prod",
+  "parent": "0103_ssm_frontier_cuda_2k",
+  "created_at": "2026-04-29T17:15:52Z",
+  "metrics": null,
+  "flags": {},
+  "status": null,
+  "description": null
+}
