@@ -143,3 +143,9 @@ export ITERATIONS=2000
 # no effect on training. Post-quant unavailable in this run (acceptable; the
 # dendritic-convergence test is on pre-quant).
 export TRIGRAM_SIDE_MEMORY=0
+
+# 0100 addendum 2: dendritic_memory.py:196 also has Tensor.item() in the forward
+# path — same dynamo bug as trigram. Set capture_scalar_outputs=1 to allow
+# scalar Python int conversion inside the compiled graph. This applies to ALL
+# CUDA experiments using dendritic OR trigram modules.
+export TORCHDYNAMO_CAPTURE_SCALAR_OUTPUTS=1

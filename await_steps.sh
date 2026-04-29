@@ -89,7 +89,11 @@ done
 
 # Phase 2: wait until we have N step lines, or the run is clearly done/stuck.
 while true; do
-  count=$(grep -cE '^step:[0-9]+/[0-9]+ train_loss:' "$LOG" 2>/dev/null || echo 0)
+  # `grep -c` prints "0" with exit 1 on no-match; `|| echo 0` then appends a
+  # second "0", yielding "0\n0" which breaks the arithmetic on line below.
+  # Use `|| true` so we keep grep's stdout (which is "0" anyway when empty).
+  count=$(grep -cE '^step:[0-9]+/[0-9]+ train_loss:' "$LOG" 2>/dev/null || true)
+  count="${count:-0}"
   if (( count >= N )); then break; fi
 
   # Cap N at the run's actual iteration count: if training has already logged
