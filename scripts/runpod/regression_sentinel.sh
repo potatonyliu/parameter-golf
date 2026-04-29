@@ -34,8 +34,17 @@ ANCHOR_MB=6.907
 TOL_BPB=0.05
 TOL_MB=0.1
 
-EXP_NAME="${RUN_ID_OVERRIDE:-regression_check_cuda}"
-EXP_SLUG="${EXP_NAME}"
+BASE_SLUG="${RUN_ID_OVERRIDE:-regression_check_cuda}"
+EXP_SLUG="${BASE_SLUG}"
+
+# Auto-version the slug on re-runs. new_experiment.sh refuses to reuse a slug
+# (any NNNN_<slug> dir blocks it), so on re-runs we bump to <slug>_v2, _v3, ...
+# until we find a free slot. Override by setting RUN_ID_OVERRIDE explicitly.
+N=2
+while compgen -G "experiments/[0-9][0-9][0-9][0-9]_${EXP_SLUG}" >/dev/null; do
+  EXP_SLUG="${BASE_SLUG}_v${N}"
+  N=$((N + 1))
+done
 
 # Find next NNNN.
 NEXT_ID=$(ls -d experiments/[0-9][0-9][0-9][0-9]_* 2>/dev/null | sort | tail -1 | sed -E 's|experiments/([0-9]{4})_.*|\1|')
@@ -43,12 +52,15 @@ NEXT_ID=$(printf "%04d" $((10#${NEXT_ID:-0} + 1)))
 EXP_DIR="experiments/${NEXT_ID}_${EXP_SLUG}"
 
 if [[ -d "$EXP_DIR" ]]; then
-  echo "ERROR: $EXP_DIR already exists. Pick a different RUN_ID_OVERRIDE." >&2
+  echo "ERROR: $EXP_DIR already exists despite auto-versioning. Investigate." >&2
   exit 2
 fi
 
-echo "Creating ${EXP_DIR} (canonical defaults)..."
-./new_experiment.sh "${EXP_SLUG}" >/dev/null
+echo "Creating ${EXP_DIR} (canonical defaults; slug=${EXP_SLUG})..."
+if ! ./new_experiment.sh "${EXP_SLUG}" >/dev/null; then
+  echo "ERROR: new_experiment.sh failed for slug ${EXP_SLUG}. Aborting." >&2
+  exit 2
+fi
 
 # Do NOT override MAX_WALLCLOCK_SECONDS here. The canonical env.sh sets it
 # to 0 deliberately — that's what selects the step-based branch of lr_mul
