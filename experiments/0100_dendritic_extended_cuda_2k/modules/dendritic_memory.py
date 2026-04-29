@@ -173,6 +173,7 @@ class DendriticMemory(nn.Module):
     # Forward                                                               #
     # --------------------------------------------------------------------- #
 
+    @torch.compiler.disable
     def forward(self, input_ids: Tensor) -> Tensor:
         """Compute (B, L, d_model) additive residual from K-gram pattern firings.
 
@@ -180,6 +181,13 @@ class DendriticMemory(nn.Module):
         For t >= K-1, encode the trailing K-gram, searchsorted into pattern_keys,
         and on exact match gather content[idx], project, and scatter into the
         output tensor.
+
+        @torch.compiler.disable: this forward uses boolean indexing (idx[mask])
+        which produces a dynamic-shape output — incompatible with the parent
+        train_gpt.py's torch.compile(fullgraph=True). The decorator carves a
+        graph break around this module so the rest of the model still compiles.
+        Cost: dendritic forward runs in eager mode; small overhead for a small
+        module.
         """
         B, L = input_ids.shape
         K = self.K
