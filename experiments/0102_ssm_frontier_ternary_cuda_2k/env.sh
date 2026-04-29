@@ -142,3 +142,12 @@ export CONTROL_TENSOR_NAME_PATTERNS="attn_scale,attn_scales,mlp_scale,mlp_scales
 export TRIGRAM_SIDE_MEMORY=0
 # 2000 steps to match 0099/0100/0101.
 export ITERATIONS=2000
+
+# 0102 production-regime override: bump to canonical CUDA batch 524288 (21x larger;
+# fits in 5090 32GB easily, fills the GPU). Also REVERT MATRIX_LR to canonical 0.045
+# — the 0099 LR×3 (0.135) was tuned at MPS small-batch regime; at canonical batch it
+# would be ~3-5x too high. This is the H100-record-recipe applied to the SSM frontier
+# with ternary body. Tests whether the compound holds at the deployment regime, not
+# just the screening regime. Step time: ~1-2s/step expected at canonical batch on 5090.
+export TRAIN_BATCH_TOKENS=524288
+export MATRIX_LR=0.045

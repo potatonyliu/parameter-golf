@@ -80,3 +80,10 @@ export MAMBA2_KILL_SELECTIVITY=1
 # - 0101 (transformer alone @ 2000 steps) — measures SSM contribution at extended training
 #   (mirrors the MPS 0058-vs-0051 -0.085 BPB SSM contribution at 200 steps)
 export ITERATIONS=2000
+
+# 0103 production-regime override: same bump as 0102 (batch 524288, canonical LR).
+# This is "SSM frontier at the H100-record recipe" without ternary — the comparator
+# for 0102's compound. With canonical batch the GPU fills, training behaves more
+# like deployment, and val_bpb should land much closer to the 1.10 H100 record.
+export TRAIN_BATCH_TOKENS=524288
+export MATRIX_LR=0.045
