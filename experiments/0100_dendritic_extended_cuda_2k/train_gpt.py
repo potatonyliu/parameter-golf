@@ -1735,7 +1735,13 @@ def main() -> None:
             module.float()
     restore_low_dim_params_to_fp32(base_model)
     if device_type == "cuda":
-        compiled_model = torch.compile(base_model, dynamic=False, fullgraph=True)
+        # 0100 override: dendritic_memory.forward uses boolean indexing
+        # (idx[mask]) producing dynamic-shape outputs, which torch.compile
+        # fullgraph=True rejects. @compiler.disable on the sub-module is also
+        # rejected (no graph breaks under fullgraph). Simplest workaround for
+        # this experiment: skip compile entirely. ~10-20% slower but the
+        # training-duration-ceiling test only needs to RUN, not be fast.
+        compiled_model = base_model
     else:
         compiled_model = base_model
     model: nn.Module = DDP(compiled_model, device_ids=[local_rank], broadcast_buffers=False) if distributed else compiled_model
