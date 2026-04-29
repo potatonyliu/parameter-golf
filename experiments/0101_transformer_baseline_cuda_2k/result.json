@@ -2,8 +2,25 @@
   "id": "0101_transformer_baseline_cuda_2k",
   "parent": "0076_confidence_gated_blend",
   "created_at": "2026-04-29T15:15:21Z",
-  "metrics": null,
-  "flags": {},
+  "metrics": {
+    "val_bpb_pre_quant": 1.5739,
+    "val_bpb_post_quant": 1.57496302,
+    "val_loss_pre_quant": 2.69,
+    "val_loss_post_quant": 2.69181856,
+    "quant_tax": 0.001063,
+    "step_avg_ms": 217.37,
+    "num_steps": 2000.0,
+    "artifact_bytes": 22134349.0,
+    "artifact_mb": 22.134,
+    "code_bytes": 98997.0,
+    "compression_ratio": 3.94
+  },
+  "flags": {
+    "crashed": false,
+    "size_violation": true,
+    "has_nan": false,
+    "exit_code": 0
+  },
   "status": null,
   "description": null
 }
