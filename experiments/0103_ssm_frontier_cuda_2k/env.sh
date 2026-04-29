@@ -90,3 +90,6 @@ export MATRIX_LR=0.045
 
 # Same — reduce iterations since canonical batch sees 21x more tokens per step.
 export ITERATIONS=1000
+
+# Same OOM correction as 0102.
+export TRAIN_BATCH_TOKENS=131072

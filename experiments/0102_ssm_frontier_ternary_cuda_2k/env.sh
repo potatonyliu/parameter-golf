@@ -155,3 +155,10 @@ export MATRIX_LR=0.045
 # Override ITERATIONS down to 1000 since at canonical batch each step sees 21x more
 # tokens. 1000 × 524288 = 524M tokens trained, still 10x more than 0099's 49M tokens.
 export ITERATIONS=1000
+
+# OOM correction (final override): TRAIN_BATCH_TOKENS=524288 with grad_accum_steps=8
+# (hardcoded at world_size=1) gives micro-batch 65536 = 64 seqs of 1024 → ~30 GB
+# activations on SSM stack (parallel attn||mamba2 doubles per-block memory). Reduce
+# to 131072 (4x smaller, micro-batch 16384 = 16 seqs of 1024, fits in 32 GB easily).
+# Still 5.3x larger than MPS-tuned 24576 — gets most of the GPU-fill benefit.
+export TRAIN_BATCH_TOKENS=131072
