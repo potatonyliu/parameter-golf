@@ -95,6 +95,40 @@ fi
 GIT_SHA=$(git rev-parse --short HEAD)
 echo "    on branch ${BRANCH} @ ${GIT_SHA}"
 
+# -------- step 1.5: align remotes + git identity for pod-side commits --------
+# The Mac-side workflow uses `fork` as the remote alias (alongside the read-only
+# `origin` for upstream openai/parameter-golf). On the pod, `git clone` only
+# creates `origin` pointing at the fork. Add a `fork` alias to the same URL so
+# the SKILL.md's `git push fork autoresearch-ssm` command works identically on
+# Mac and pod.
+if ! git remote get-url fork >/dev/null 2>&1; then
+  ORIGIN_URL=$(git remote get-url origin)
+  git remote add fork "${ORIGIN_URL}"
+  echo "    added remote: fork → ${ORIGIN_URL}"
+fi
+
+# Set a default git identity so pod-side commits don't fail with
+# "tell me who you are." Override by setting GIT_USER_NAME / GIT_USER_EMAIL
+# when invoking setup_pod.sh, or by editing ~/.gitconfig on the pod after.
+GIT_USER_NAME="${GIT_USER_NAME:-runpod-agent}"
+GIT_USER_EMAIL="${GIT_USER_EMAIL:-runpod-agent@parameter-golf.local}"
+if [[ -z "$(git config --global user.name 2>/dev/null)" ]]; then
+  git config --global user.name "${GIT_USER_NAME}"
+  git config --global user.email "${GIT_USER_EMAIL}"
+  echo "    git identity set: ${GIT_USER_NAME} <${GIT_USER_EMAIL}>"
+fi
+
+# Configure credential.helper store so the FIRST git push prompts for username
+# + PAT once and stores them in ~/.git-credentials. This script CANNOT enter
+# the PAT for you — that's the one-time human step. Subsequent pushes reuse
+# the stored credential. The PAT dies with the pod (network volume only
+# persists if your /workspace setup mounts ~/.git-credentials there, which the
+# default doesn't).
+if [[ -z "$(git config --global credential.helper 2>/dev/null)" ]]; then
+  git config --global credential.helper store
+  echo "    git credential.helper=store; first 'git push' will prompt for PAT once."
+fi
+
 # -------- step 2: create venv --------
 # Critical: --system-site-packages so the venv inherits the system-installed
 # PyTorch + CUDA from the RunPod image. requirements-cuda.txt does NOT pin torch

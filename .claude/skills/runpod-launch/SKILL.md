@@ -18,7 +18,11 @@ You operate **from your Mac via SSH** on a paid pod. The pod bills per second; i
                git push fork autoresearch-ssm
 [ ] 4. POD     ssh runpod 'cd /workspace/parameter-golf-ssm && git pull'
 [ ] 5. POD     ssh runpod 'cd /workspace/parameter-golf-ssm && source .venv/bin/activate && \
-                           bash scripts/runpod/preflight.sh experiments/NNNN_<slug>'
+                           ALLOW_NO_TMUX=1 bash scripts/runpod/preflight.sh experiments/NNNN_<slug>'
+                                                  ↑ override the tmux check: when you launch
+                                                    from `ssh runpod` you're not IN tmux, but
+                                                    step 6 puts the run INTO a detached tmux,
+                                                    so the safety the check is for is met.
 [ ] 6. POD     launch via tmux (detached so SSH disconnect is safe):
        single GPU:
          ssh runpod 'cd /workspace/parameter-golf-ssm/experiments/NNNN_<slug> && \
@@ -42,6 +46,20 @@ You operate **from your Mac via SSH** on a paid pod. The pod bills per second; i
 **Two `git push`/`git pull` events per experiment is the cost of state consistency.** Skip a step and your `results.tsv` row is for the wrong code, or your local Mac never sees the result.
 
 **What syncs via git, what doesn't.** `experiments/NNNN_<slug>/` tracks the lightweight files: `env.sh`, `plan.md`, `train_gpt.py`, `result.json`, `modules/` (code only). The heavy/generated stuff stays pod-local: `run.log`, `logs/`, `final_model.pt`, `final_model.int8.ptz`, `__pycache__/` (see `.gitignore`). If you need the raw `run.log` on Mac (debugging a crash, etc.), `ssh runpod 'cat experiments/NNNN_<slug>/run.log'` instead of expecting `git pull` to bring it.
+
+**One-time pod setup the FIRST time you push from a fresh pod** (handled by `setup_pod.sh`'s identity + credential-helper config, but you'll still hit it once for the PAT):
+
+```bash
+# On the pod, the first `git push fork autoresearch-ssm` prompts for credentials.
+# Generate a fine-grained PAT at https://github.com/settings/tokens?type=beta:
+#   - Repo access: only the fork repo (e.g. potatonyliu/parameter-golf)
+#   - Permissions: Contents:Write, Metadata:Read
+#   - Expiration: 1 day (PAT dies with the pod anyway)
+# Then on the pod:
+#   Username: <github-username>
+#   Password: <paste PAT>
+# credential.helper store saves it to ~/.git-credentials; subsequent pushes are silent.
+```
 
 **Why `git status` between add and commit.** `experiments/` was historically blanket-ignored for local MPS scratch work. The current `.gitignore` tracks new experiment dirs but ignores generated artifacts inside them. `git status` after `git add` is the cheap check that the right files are staged before you commit a confused snapshot.
 
