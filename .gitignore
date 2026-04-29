@@ -16,9 +16,21 @@ logs/
 final_model.pt
 final_model.int8.ptz
 
-# Autoresearch harness: experiments/ is per-run scratch state, not committed.
-# The agent promotes wins to winners/ instead (see program.md).
-experiments/
+# Autoresearch harness: experiments/ is partially tracked.
+#   - env.sh / plan.md / train_gpt.py / result.json / modules/  → tracked
+#     (so Mac and Pod stay in sync on what was queued + what came back).
+#   - run.log / logs/ / final_model.* / __pycache__   → ignored per below
+#     (heavy generated artifacts; reproducible from the tracked files).
+# Pre-RunPod note: the prior MPS workflow had `experiments/` blanket-ignored;
+# the existing local experiment dirs from that era are now visible to git
+# status as untracked. Add only the specific NNNN_<slug>/ you're working on
+# (`git add experiments/NNNN_<slug>`); never `git add -A` from repo root.
+experiments/*/run.log
+experiments/*/logs/
+experiments/*/final_model.pt
+experiments/*/final_model.int8.ptz
+experiments/*/__pycache__/
+experiments/*/modules/__pycache__/
 
 # Ephemeral scratch space the agent uses for derivations, profiling, etc.
 scratch/

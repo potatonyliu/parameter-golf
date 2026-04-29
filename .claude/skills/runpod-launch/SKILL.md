@@ -10,13 +10,16 @@ You operate **from your Mac via SSH** on a paid pod. The pod bills per second; i
 ## Workflow — every experiment, every time
 
 ```
-[ ] 1. LOCAL  ./new_experiment.sh <slug> [<parent>]
-[ ] 2. LOCAL  edit experiments/NNNN_<slug>/env.sh + plan.md
-[ ] 3. LOCAL  git add ... && git commit -m "..." && git push fork autoresearch-ssm
-[ ] 4. POD    ssh runpod 'cd /workspace/parameter-golf-ssm && git pull'
-[ ] 5. POD    ssh runpod 'cd /workspace/parameter-golf-ssm && source .venv/bin/activate && \
-                          bash scripts/runpod/preflight.sh experiments/NNNN_<slug>'
-[ ] 6. POD    launch via tmux (detached so SSH disconnect is safe):
+[ ] 1. LOCAL   ./new_experiment.sh <slug> [<parent>]
+[ ] 2. LOCAL   edit experiments/NNNN_<slug>/env.sh + plan.md
+[ ] 3. LOCAL   git add experiments/NNNN_<slug>
+               git status                              ← verify intended files staged
+               git commit -m "queue exp NNNN_<slug>"
+               git push fork autoresearch-ssm
+[ ] 4. POD     ssh runpod 'cd /workspace/parameter-golf-ssm && git pull'
+[ ] 5. POD     ssh runpod 'cd /workspace/parameter-golf-ssm && source .venv/bin/activate && \
+                           bash scripts/runpod/preflight.sh experiments/NNNN_<slug>'
+[ ] 6. POD     launch via tmux (detached so SSH disconnect is safe):
        single GPU:
          ssh runpod 'cd /workspace/parameter-golf-ssm/experiments/NNNN_<slug> && \
                      tmux new -d -s expNNNN \
@@ -25,17 +28,22 @@ You operate **from your Mac via SSH** on a paid pod. The pod bills per second; i
          ssh runpod 'cd /workspace/parameter-golf-ssm && source .venv/bin/activate && \
                      tmux new -d -s expNNNN \
                      "bash scripts/runpod/launch_h100.sh experiments/NNNN_<slug>"'
-[ ] 7. POD    poll, no faster than once per ~30s:
-                ssh runpod 'tmux capture-pane -t expNNNN -p | tail -20'
-[ ] 8. POD    on completion, commit results FROM the pod:
-                ssh runpod 'cd /workspace/parameter-golf-ssm && \
-                            git add experiments/NNNN_<slug> results.tsv && \
-                            git commit -m "exp NNNN_<slug> result" && \
-                            git push fork autoresearch-ssm'
-[ ] 9. LOCAL  git pull
+[ ] 7. POD     poll, no faster than once per ~30s:
+                 ssh runpod 'tmux capture-pane -t expNNNN -p | tail -20'
+[ ] 8. POD     on completion, commit results FROM the pod:
+                 ssh runpod 'cd /workspace/parameter-golf-ssm && \
+                             git add experiments/NNNN_<slug> results.tsv && \
+                             git status && \
+                             git commit -m "exp NNNN_<slug> result" && \
+                             git push fork autoresearch-ssm'
+[ ] 9. LOCAL   git pull   ← results land here; results.tsv row + result.json + env.sh
 ```
 
 **Two `git push`/`git pull` events per experiment is the cost of state consistency.** Skip a step and your `results.tsv` row is for the wrong code, or your local Mac never sees the result.
+
+**What syncs via git, what doesn't.** `experiments/NNNN_<slug>/` tracks the lightweight files: `env.sh`, `plan.md`, `train_gpt.py`, `result.json`, `modules/` (code only). The heavy/generated stuff stays pod-local: `run.log`, `logs/`, `final_model.pt`, `final_model.int8.ptz`, `__pycache__/` (see `.gitignore`). If you need the raw `run.log` on Mac (debugging a crash, etc.), `ssh runpod 'cat experiments/NNNN_<slug>/run.log'` instead of expecting `git pull` to bring it.
+
+**Why `git status` between add and commit.** `experiments/` was historically blanket-ignored for local MPS scratch work. The current `.gitignore` tracks new experiment dirs but ignores generated artifacts inside them. `git status` after `git add` is the cheap check that the right files are staged before you commit a confused snapshot.
 
 `scripts/runpod/preflight.sh` rejects launches if: cwd outside `/workspace`, GPU invisible, `.venv` inactive, data shards missing, `plan.md` unfilled, `MAX_WALLCLOCK_SECONDS` unset/0/>7200, `/workspace` <2 GiB free. (Sentinel/canonical-repro runs that need `MAX_WALLCLOCK_SECONDS=0` to hit the step-based `lr_mul` branch can override with `ALLOW_NO_WALLCLOCK_CAP=1`.)
 
@@ -80,6 +88,8 @@ If the next experiment depends on N's outcome, draft 2–3 conditional next-step
 - `import torch` fails after setup → venv made without `--system-site-packages`. `rm -rf .venv` and re-run `setup_pod.sh`.
 - "no kernel image is available" on Blackwell GPUs (5090) → image torch is too old (need ≥ 2.5). Report.
 - `torchrun: command not found` → use `python -m torch.distributed.run` (already what `launch_h100.sh` does).
+- `git push` from pod prompts for credentials and you can't paste any → no PAT/credential-helper configured on this pod. Stop and tell Tony; do NOT store a secret without his go-ahead. (One-time fix on the pod: `git config --global credential.helper store && git push` then enter username + a short-expiry PAT once. The PAT dies with the pod.)
+- `git add experiments/...` reports "Changes not staged" or "nothing added" → the path may have been silently filtered by `.gitignore`. Run `git status` before the commit; if the experiment dir doesn't show up, check `git check-ignore -v <path>` to find the offending rule.
 
 ## Wrap before disconnecting
 
@@ -93,6 +103,6 @@ If the next experiment depends on N's outcome, draft 2–3 conditional next-step
 
 Don't go silent. Don't terminate. Don't hibernate. If Tony's asleep and work is complete, the pod still bills — ask sooner.
 
-## Deeper context (only when needed)
+## Deeper context
 
 `RUNPOD.md` (sibling file) holds Tony's full operating manual: cost model, lifecycle decisions, MPS→CUDA transfer notes, phase guidance. The workflow above is sufficient for execution; reach for `RUNPOD.md` when something above is unclear or you want the rationale.
