@@ -118,3 +118,7 @@ export CONF_GATE_THRESHOLD=-1.0
 export ITERATIONS=2000
 export TERNARY_BODY=0
 export MATRIX_LR=0.045
+
+# 0101 addendum: same trigram skip as 0100 — keeps the apples-to-apples pre-quant
+# comparison clean and avoids the dynamo bug + 10-min build cost.
+export TRIGRAM_SIDE_MEMORY=0

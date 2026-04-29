@@ -135,3 +135,11 @@ export DENDRITIC_BUILD_TOKENS=50000000
 # Also CUDA-validates DendriticMemory module (M=32K dendrites, sorted-key buffer for
 # exact 4-gram match, learnable content vectors + zero-init proj head).
 export ITERATIONS=2000
+
+# 0100 addendum: skip TRIGRAM_SIDE_MEMORY to avoid the torch.compile/dynamo bug
+# 0099 hit at post-quant eval (`Tensor.item()` with capture_scalar_outputs=False
+# in trigram_side_memory.py:634) AND save the ~10-min trigram pack build.
+# Pre-quant val_bpb is model-only either way — trigram is inference-time blend,
+# no effect on training. Post-quant unavailable in this run (acceptable; the
+# dendritic-convergence test is on pre-quant).
+export TRIGRAM_SIDE_MEMORY=0
