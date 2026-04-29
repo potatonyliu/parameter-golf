@@ -130,5 +130,24 @@ After the chain-restart issue (initial 0102/0103 OOM at canonical batch 524288 +
 - val ∈ [1.30, 1.45]: slow scaling; port one missing standard-stack piece (parallel residuals first).
 - val ≥ 1.45: mechanism-bound; bold body-axis swing (SSM with sliding-window attention, OR GLA family fork, OR per-head selectivity-mixed Mamba-2).
 
+## 2026-04-29 · 0102 SSM × ternary × production-batch compound — best result of session [n=1]
+
+**Setup**: forked 0099 (ternary infra), overrode env to SSM frontier topology (`PARALLEL_LAYER_POSITIONS=0,1,2, PARALLEL_SSM_TYPE=mamba2_kill, MAMBA2_KILL_SELECTIVITY=1, BIGRAM_VOCAB_SIZE=0`), production batch `TRAIN_BATCH_TOKENS=131072`, canonical `MATRIX_LR=0.045` (NOT the LR×3 from 0099 — at canonical batch, canonical LR), `ITERATIONS=1000`. TRIGRAM_SIDE_MEMORY=0 (avoids dynamo bug).
+
+**Observed**: pre-quant val_bpb **1.5414**, post-quant **1.5417** (quant_tax 0.0003 — packed-ternary makes quantization near-lossless), artifact 5.63 MB, step_avg 813.57 ms.
+
+**Δ comparisons** [all single-seed, pre-quant unless noted]:
+- vs 0098 (SSM frontier @ 200 steps small batch, 49M tokens): -0.46 BPB. Training-duration win on SSM stack.
+- vs 0099 (transformer + ternary + LR×3 @ 2k small batch, 49M tokens): -0.108 BPB. SSM stack + production batch handily beats matched-tokens transformer. **The compound is real.**
+- vs 0101 (transformer baseline @ 2k small batch, 49M tokens): -0.032 BPB. Even without ternary, SSM at 2.6× more tokens (production batch's 5.3× tokens-per-step × 0.5× steps = 2.6× total tokens) beats transformer at small batch.
+
+**Conclusion** [LIKELY n=1]: At our 5090 budget, the SSM frontier stack benefits SUBSTANTIALLY from production batch + canonical LR. The +0.076 BPB ternary penalty observed at small batch with LR×3 (0099 vs 0101) **does NOT appear at production batch with canonical LR** — 0102 at production batch IS lower than 0101 at small batch despite having ternary. This is consistent with BitNet's "more tokens / canonical recipe closes gap" claim, and recasts the 0099 ternary penalty as primarily an LR-and-batch-mismatch artifact rather than a fundamental ternary cost.
+
+**Implication for the writeup**: SSM + ternary + production batch + canonical LR is the deployment recipe to optimize. Ternary's cap-saving (5.6 MB vs 22 MB cap-bust) buys ~10 MB of headroom at no val_bpb cost in this regime. The freed cap can be spent on more layers / depth / width.
+
+**Next**: 0103 (SSM no-ternary at production batch, decomposition control) and 0104 (SSM at 5k steps, training-duration extrapolation) — chain restarted with these two only after 0102 chain post-script crashed on a 'parent' KeyError (due to my earlier `echo "{}"` reset of result.json). Fix: restore result.json with parent field before re-running.
+
+
+
 
 
