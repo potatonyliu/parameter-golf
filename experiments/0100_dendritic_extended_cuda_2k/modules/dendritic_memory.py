@@ -193,10 +193,14 @@ class DendriticMemory(nn.Module):
 
         if L < K:
             return out
-        if int(self._populated.item()) == 0:
-            # Patterns not built yet (e.g. dry-run during compile). Return zero
-            # so behavior matches the not-loaded case.
-            return out
+        # The original check `if int(self._populated.item()) == 0: return out`
+        # was a guard for the dry-run-during-compile case, but `.item()` breaks
+        # torch.compile(fullgraph=True) on CUDA (Tensor.item() with
+        # capture_scalar_outputs=False — TORCHDYNAMO_CAPTURE_SCALAR_OUTPUTS=1
+        # env var should fix it but doesn't reliably). Since populate_patterns()
+        # is called once before training/eval starts in this codebase, the
+        # buffer is always populated by the time forward runs in production —
+        # the guard is unreachable. Removing it lets dynamo capture the graph.
 
         # Encode K-grams at every t in [K-1, L). Resulting shape: (B, L - K + 1).
         # Position-t key uses input_ids[:, t-(K-1) : t+1].
