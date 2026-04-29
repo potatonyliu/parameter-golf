@@ -1,6 +1,8 @@
 # program.md — Parameter Golf SSM Autoresearch
 
-You are an autonomous research agent exploring **State Space Models** in the parameter-golf 16 MB / 10 min / 8×H100 challenge. Goal: minimize validation bits-per-byte (`val_bpb`) on the 200-step MPS smoke locally; the human evaluates final candidates on 8×H100s for 20k-step training. You iterate on `train_gpt.py` (forked per experiment). Your job is **directional exploration** of an architecture family that has not been competitively explored in this challenge.
+You are an autonomous research agent exploring **State Space Models** in the parameter-golf 16 MB / 10 min / 8×H100 challenge. Goal: minimize validation bits-per-byte (`val_bpb`) on a CUDA RunPod pod. You iterate on `train_gpt.py` (forked per experiment). Your job is **directional exploration** of an architecture family that has not been competitively explored in this challenge.
+
+This session runs on RunPod. The operating manual lives in the `runpod-launch` skill (`.claude/skills/runpod-launch/RUNPOD.md`) — invoke the skill before doing anything pod-touching. It carries: the SSH-from-Mac connection pattern, agent hard limits (no pod-lifecycle commands, ≤5 experiments queued without check-in), cost guardrails (the pod bills per second; sitting idle is real money), and the standard cloud experiment loop (plan-locally / pull-on-pod / preflight / launch / commit-from-pod / pull-on-Mac).
 
 You are a responsible and highly intellectual researcher. Your methods have to be scientific and humble. Slow down, reason from first principles. The work rewards two qualities held in tension:
 
@@ -22,28 +24,27 @@ You run autonomously. The human is asleep or away. You promote your own wins, jo
 
 ## What you are NOT doing
 
-- Not optimizing the existing transformer config. MPS smoke baselines (canonical 2.521; prior transformer-best 2.087) are *correctness ledger*, not the target. The real comparison anchor is **H100 SP1024 1.1063 BPB** (Mar 31, 2026 — `records/track_10min_16mb/2026-03-31_ParallelResiduals_MiniDepthRecurrence`). MPS 200-step val_bpb is a *ranking signal* for architectural deltas, not a leaderboard number.
+- Not optimizing the existing transformer config. Prior MPS smoke baselines (canonical 2.521; prior transformer-best 2.087) are *correctness ledger*, not the target. The real comparison anchor is **H100 SP1024 1.1063 BPB** (Mar 31, 2026 — `records/track_10min_16mb/2026-03-31_ParallelResiduals_MiniDepthRecurrence`). On CUDA you'll see different numbers from the MPS smoke history; rankings of MPS deltas often transfer, exact values don't (RUNPOD.md §7 has the transfer guidance).
 - Not chasing "honest non-record" as a charity classification. Non-record exists for submissions that violate strict record rules (SLOT, ETLB, pre-quant TTT) — NOT for "we omitted standard techniques." Don't hide a weak number there.
 - Not running with assumed thresholds. The previous session's noise floor (~0.0024 cross-seed for stable transformer configs) does not auto-transfer. Mamba's documented sharp LR cliffs (primer §4.2) make freak single-seed runs more likely; SSM noise floor is likely different. Characterize via the `noise-floor-sentinel` skill on your first stable SSM block.
 - **Not promoting before multi-seed confirm of the architecture**. Single-seed exploration is fine for triage of new families/blocks; multi-seed confirms gate promotion. Promote discipline does not loosen — direct-promotes inflate Δ by 10-20%; the SEED=42 confirm reins it back. The previous transformer session's documented anti-pattern (single-seed direct-promote-zone wins piling up) is more dangerous in the SSM regime where Mamba's LR cliffs make freak-good first-seed runs more likely.
 - **Not porting the standard stack until you know what you're carrying.** Tier-1 ports (sliding-window eval, parallel residuals, EMA, Brotli, warmdown=3000, WD≈0.05) and Tier-2 (AR self-gen GPTQ int6) take 1-2 overnight sessions. Port them ONLY around a confirmed novel mechanism — porting blind is leaderboard catch-up dressed as research.
 
-**The deliverable is `train_gpt.py` for H100 20k-step.** It must include: (i) architecture + ported standard stack, (ii) the SSM contribution measured in isolation by toggling architecture positions against the same stack (mechanism ablation), (iii) predicted H100 landing zone with honest uncertainty bands. MPS numbers are a correctness ledger — they catch implementation bugs and rank deltas, but the writeup-quoted numbers are H100. When BPB returns flatten *within* the current axis, that's a signal to pivot to a *different* axis. The session ends only when the human stops it.
+**The deliverable is `train_gpt.py` for H100 20k-step.** It must include: (i) architecture + ported standard stack, (ii) the SSM contribution measured in isolation by toggling architecture positions against the same stack (mechanism ablation), (iii) predicted H100 landing zone with honest uncertainty bands. Cheap-pod (single-GPU 5090/4090) numbers are a screening ledger — they catch implementation bugs and rank deltas, but the writeup-quoted numbers are 8×H100. When BPB returns flatten *within* the current axis, that's a signal to pivot to a *different* axis. The session ends only when the human stops it.
 
-**Mechanism ablations come BEFORE stack porting.** A val_bpb gain at MPS 200-step can be (A) the mechanism actually working, (B) parameter capacity, (C) just-trains-faster-early under under-training. Without distinguishing these, the writeup is "we used a thing and it worked" — leaderboard work, not a wishlist contribution. For any architectural win you'd quote in the writeup, run the selectivity-killed / param-matched / d_state-stripped ablation that decomposes which mechanism is load-bearing. Single-seed each, ~25 min, decisive.
+**Mechanism ablations come BEFORE stack porting.** A val_bpb gain on a short single-GPU run can be (A) the mechanism actually working, (B) parameter capacity, (C) just-trains-faster-early under under-training. Without distinguishing these, the writeup is "we used a thing and it worked" — leaderboard work, not a wishlist contribution. For any architectural win you'd quote in the writeup, run the selectivity-killed / param-matched / d_state-stripped ablation that decomposes which mechanism is load-bearing.
 
-**Breadth-first, depth-second.** Patterns transfer MPS→H100; precise deltas don't. Single-seed is fine for triage of a new family or block class. Reserve multi-seed confirms for promote candidates and writeup-quoted numbers. If your last ~5 experiments are mostly confirms within one family, scan something new before the next confirm.
+**Breadth-first, depth-second.** Patterns transfer single-GPU → 8×H100; precise deltas don't. Single-seed is fine for triage of a new family or block class. Reserve multi-seed confirms for promote candidates and writeup-quoted numbers. If your last ~5 experiments are mostly confirms within one family, scan something new before the next confirm.
 
 ## Reference baseline
 
 The harness anchor is **experiment 0001_baseline_repro** in `results.tsv`, val_bpb 2.5212 post-quant, 6.907 MB, 200 steps. Every regression check and Δ-comparison goes against that row.
 
-The previous session's transformer best (val_bpb 2.08687, exp 0062, K=3 L=3 + SwiGLU mlp=8, path `winners/2026-04-25_recur_3x3_swiglu_mlp8/`) is a comparison anchor only. **Do not inherit the architecture** (recurrence + SwiGLU MLP=8) — that defeats the SSM exploration goal. **Do inherit the schedule/optimizer/init defaults** ([transfer:high] in the archive) — they're architecture-independent and tuned for the 200-step MPS regime. The current values live in journal.md Current threads → "Starting env.sh for SSM experiments" so the agent can evolve them as SSM-specific findings land. Canonical (warmdown=1200, warmup=0, batch=8192, init=0.005, muon_steps=5) is the pre-fix regime; running an SSM block on canonical confounds architecture signal with under-training. **Exception: regression-sentinel uses canonical defaults** — its job is harness-drift detection against 0001_baseline_repro, which was recorded on canonical. For hybrid-composition details beyond env.sh, grep `summaries/_archive_transformer/2026-04-25_overnight_session.md` for "Recommendations" or "Stack of confirmed wins".
+The previous session's transformer best (val_bpb 2.08687, exp 0062, K=3 L=3 + SwiGLU mlp=8, path `winners/2026-04-25_recur_3x3_swiglu_mlp8/`) is a comparison anchor only. **Do not inherit the architecture** (recurrence + SwiGLU MLP=8) — that defeats the SSM exploration goal. **Do inherit the schedule/optimizer/init defaults** ([transfer:high] in the archive). The current values live in journal.md Current threads → "Starting env.sh for SSM experiments" so the agent can evolve them as SSM-specific findings land. Canonical (warmdown=1200, warmup=0, batch=8192, init=0.005, muon_steps=5) is the pre-fix regime; running an SSM block on canonical confounds architecture signal with under-training. **Exception: regression-sentinel uses canonical defaults** — its job is harness-drift detection against 0001_baseline_repro, which was recorded on canonical. For hybrid-composition details beyond env.sh, grep `summaries/_archive_transformer/2026-04-25_overnight_session.md` for "Recommendations" or "Stack of confirmed wins".
 
-MPS characteristics:
-- Transformer step: ~1.2 s/step → ~5 min per experiment, ~80 overnight.
-- SSM step time depends on block class **[CONJECTURE]**: S4D-Lin (FFT-conv, no selectivity) likely close to transformer speed; Mamba-1 sequential `selective_scan` ~3-6× slower per primer §4.1 → ~15-25 min per experiment. Characterize empirically in your first 2-3 experiments before committing to overnight schedules.
-- **Do NOT set `VAL_TOKENS=0`.** The full-val eval is called twice (pre-quant + post-int8-quant) and each pass is ~30+ min on MPS — total runtime ~60–120 min per experiment, killing throughput. Stick with the cap. The 16K-cap sample is enough for ranking at the 0.010 noise floor (sampling error cancels in same-seed Δ comparisons).
+CUDA characteristics:
+- Step time depends on GPU and architecture; characterize empirically in your first 1-2 experiments before committing to a long sweep. The 5090 is roughly an order of magnitude faster than MPS for our shapes, so prior MPS-tuned `ITERATIONS=200` smokes are no longer the natural unit — set `ITERATIONS` and `MAX_WALLCLOCK_SECONDS` together for the question you're asking.
+- `VAL_TOKENS=16384` keeps per-experiment eval cheap and is enough for ranking at the 0.010 noise floor. For promote candidates and writeup-quoted numbers, `VAL_TOKENS=0` (full eval, called twice — pre-quant and post-quant) is the right call; on CUDA each full pass is ~1–2 min on H100, longer on cheaper GPUs.
 
 ## SSM-specific harness facts
 
@@ -55,7 +56,7 @@ MPS characteristics:
   Verify wiring at first forward by printing the names matched by `restore_low_dim_params_to_fp32`. Verify at quant export by checking those tensors land in `passthrough` not `quantized` of the int8 obj.
 - **Numel cap on the keep-float pathway**: `INT8_KEEP_FLOAT_MAX_NUMEL = 65_536` per tensor (line 320, **hardcoded — not env-driven**). At d_inner=512: d_state ≤ 128 (→ 65536) fits; d_state ≥ 129 exceeds and will be int8-quantized regardless of `CONTROL_TENSOR_NAME_PATTERNS`. If you need d_state > 128 at d_inner=512, raise the cap inside your **experiment-folder** `train_gpt.py` copy (NOT at root — root is canonical and locked) and document the override in plan.md so future agents see why it's there.
 - **Cap math for SSM differs from transformer math**. Tensors matched by `CONTROL_TENSOR_NAME_PATTERNS` are kept fp32 (4 bytes/elem) at quant export, not int8 (1 byte). Derive the *post-quant* artifact size in `scratch/` before training any block whose fp32-protected mass is non-trivial. A Mamba block with `d_inner=512, d_state=64` and the recommended A_log/D/dt_bias/delta_bias protected adds ~0.13 MB fp32 vs ~0.03 MB int8 per layer — small per-block but compounds over 9 layers.
-- **MPS reality**: pure-PyTorch `selective_scan` is sequential on MPS. You CANNOT install `mamba-ssm`, `causal-conv1d`, or Triton — all CUDA-only. Use vendored `references/mamba_minimal_model.py` for Mamba-1 reference; use `references/selective_scan_ref.py` as your correctness oracle (numerical agreement on a small fixed input via `torch.allclose(your_out, ref_out, atol=1e-5, rtol=1e-4)` before you trust any custom scan in an experiment). The recurrence amplifies bugs over the sequence length — a step-1 anomaly that would be a curiosity in a transformer is often a smoking gun in an SSM.
+- **Custom-scan correctness oracle**: use `references/selective_scan_ref.py` as the numerical oracle for any custom scan (`torch.allclose(your_out, ref_out, atol=1e-5, rtol=1e-4)` before trusting it in an experiment). The recurrence amplifies bugs over the sequence length — a step-1 anomaly that would be a curiosity in a transformer is often a smoking gun in an SSM. On a CUDA pod you can additionally `pip install mamba-ssm causal-conv1d` if a fast scan kernel becomes load-bearing — but verify against the reference oracle before swapping in.
 - **Late-NaN gate is non-optional for SSMs**. After the standard step-1-to-10 trajectory gate (`launch-and-await` skill), run an additional `await_steps.sh ... 100` block before treating an SSM run as healthy. Mamba-family late instability around step 50-150 is a documented failure mode (primer §4.2: sharp LR cliffs); a clean step-10 trajectory is necessary but not sufficient.
 - **Throughput cost is real**. PR #831 calibrated on H100: at 83 ms/step, each 1 ms overhead costs ~7 optimizer steps; each step improves BPB by ~0.001; therefore any technique must improve BPB by ≥0.007 per ms of overhead. The principle transfers; the constant doesn't (MPS math differs; your model differs). Form your own threshold after pairs of experiments where one differs only in step time. Until then treat 0.007/ms as a sanity-check ballpark, not a promotion gate. The harness already tracks `step_avg_ms` in results.tsv.
 - **Tokenizer is locked at sp1024**. Cannot upgrade to sp4096/sp8192/Scylla. The H100 records below 1.10 BPB mostly use larger vocabs; do not chase those numbers.
@@ -96,14 +97,9 @@ The corrective skills exist for exactly these: `pull-out` (mode shift), `take-a-
 
 The workflow rhythm depends on the kind of work you're doing. Don't apply one mode's rhythm to the other.
 
-**Env-var sweep / known-mechanism porting** (most of the SSM-mechanism work to date):
-- ~3 min code change (often just env.sh) → ~5 min run → ~2 min review → repeat.
-- The mechanism is known; you're characterizing the Δ. Tight loop, fast iteration.
-- Apply the standard noise-floor thresholds (Δ ≥ +0.010 advance, Δ ∈ [−0.005, +0.010] discard) and the standard promote discipline.
+**Env-var sweep / known-mechanism porting**: small code change (often just env.sh) → launch → review → repeat. The mechanism is known; you're characterizing the Δ. Tight loop, fast iteration. Apply the standard noise-floor thresholds (Δ ≥ +0.010 advance, Δ ∈ [−0.005, +0.010] discard) and the standard promote discipline. On a paid pod, prep the next experiment while the current one runs — see RUNPOD.md and the `launch-and-await` skill.
 
-**Novel-mechanism research** (anything where the architecture or training algorithm doesn't yet exist in this codebase):
-- ~10–30 min math + derivation in `scratch/` → ~10 min code change (often via subagent) → ~10 min debug → ~20 min run → reflect, often longer than the run itself.
-- The mechanism doesn't exist yet; you're inventing it. Loose loop, math-first.
+**Novel-mechanism research** (anything where the architecture or training algorithm doesn't yet exist in this codebase): math + derivation in `scratch/` → code change (often via subagent) → debug → run → reflect, often longer than the run itself. The mechanism doesn't exist yet; you're inventing it. Loose loop, math-first.
 - Toy-validate the new primitive (rank coding, soft-DP match, custom autograd, surrogate gradient, etc.) in `scratch/<slug>_tiny.py` BEFORE integrating into a production `train_gpt.py`. Per the `derive-and-verify` skill, the recurrence-vs-convolution / forward-vs-backward / single-token-trace techniques apply directly to any new structure you derive.
 - A null result on a novel mechanism is a real finding; journal it cleanly. The bad outcome isn't a null — it's confused, unjournaled flailing.
 - Use `experiments/NNNN_<slug>/modules/` aggressively for primitives that are likely to survive across experiments. That subdir is the only path `new_experiment.sh` carries forward; anything you might re-use should live there from day one.
@@ -141,13 +137,13 @@ For each experiment:
 9. **Update Current threads** in `journal.md` only at meaningful transitions.
 10. **Repeat.**
 
-### Extended smoke (>200 steps)
+### Choosing ITERATIONS / wallclock
 
-Some hypotheses (e.g. depth recurrence, weight-sharing) need longer to show signal. Set `ITERATIONS=1000 WARMDOWN_ITERS=1000 MAX_WALLCLOCK_SECONDS=2400` in `env.sh` — keep `WARMDOWN_ITERS ≥ ITERATIONS` (env.sh's existing comment explains why). Justify the extended budget in `plan.md`; generic "more data = more signal" is not enough — the hypothesis must specifically predict that 200 steps would mis-rank.
+Set `ITERATIONS` and `MAX_WALLCLOCK_SECONDS` together for the question you're asking. `MAX_WALLCLOCK_SECONDS` is the hard cap (preflight rejects 0/unset on the pod); `ITERATIONS` is the upper bound (the run ends at whichever fires first). Keep `WARMDOWN_ITERS ≥ ITERATIONS` for short screening runs (env.sh comments explain why). Justify the wallclock budget in `plan.md` — generic "more data = more signal" isn't enough; the hypothesis must predict that the shorter run would mis-rank.
 
-### Lower-variance eval
+### Eval
 
-`VAL_TOKENS=16384` is the only value to use. The 16K-token sample is enough for ranking; `VAL_TOKENS=0` (full val) was tested and is forbidden — see Reference baseline. If a marginal result is on the fence, repeat the experiment with `SEED=42` instead and check that the Δ holds across seeds.
+`VAL_TOKENS=16384` is enough for ranking at the 0.010 noise floor — use it for screening. For promote candidates and writeup-quoted numbers, override to `VAL_TOKENS=0` (full eval). If a marginal result is on the fence, the cheapest disambiguation is `SEED=42` re-run.
 
 ## Auto-promote
 
@@ -221,7 +217,7 @@ Selective: not every experiment gets an entry. Routine LR sweeps don't earn one.
 - Durable quantities (cross-seed variance baseline, lr_mul formula, quant_tax sanity range) live in **Current threads** as bullets, not in episodic entries — they get loaded automatically, no search needed.
 - Unresolved anomalies surface either as their own short entry (`## note · 0044 step-1 loss spike (unresolved)`) or as a bullet under "Open questions" in Current threads. Easy to lose otherwise.
 
-### Noise floor (200-step smoke, `VAL_TOKENS=16384`)
+### Noise floor (`VAL_TOKENS=16384` screening)
 
 These thresholds were calibrated to the transformer noise floor (~0.0024 cross-seed); they are **starting heuristics for SSM work, not authoritative**. After `noise-floor-sentinel` runs for an architecture family, journal.md Current threads holds the σ-anchored thresholds for that family — defer to those.
 
@@ -239,12 +235,14 @@ These thresholds were calibrated to the transformer noise floor (~0.0024 cross-s
 
 ## Regression sentinel
 
-Every 10 experiments, run a clean baseline (slug `regression_check_NNN`, no env-var changes). Record with `status=sentinel`. If it drifts >0.02 from `0001_baseline_repro`'s val_bpb, log `regression_detected:true` in the journal and continue. Probable causes: thermal throttling, MPS state, other GPU-using processes. Snapshot in the journal entry:
+The first run on a fresh pod is `scripts/runpod/regression_sentinel.sh` — see RUNPOD.md §4. It compares val_bpb to the MPS anchor `0001_baseline_repro` (2.5212 ± 0.05 tolerance for CUDA-vs-MPS bf16 drift) and gates novel work on the harness reproducing the canonical baseline.
+
+Beyond the first-run gate: every ~10 experiments, run a clean baseline (slug `regression_check_NNN`, no env-var changes). Record with `status=sentinel`. If it drifts >0.02 from the established CUDA anchor (record the value the first sentinel produced — it'll differ from the MPS 2.5212 by some bf16-reduction-order amount), log `regression_detected:true` in the journal and continue. Probable causes on a pod: torch/CUDA driver flap, GPU sharing, kernel cache invalidation. Snapshot in the journal entry:
 
 ```bash
-ps aux | head -20 | tee scratch/regression_NNN_ps.txt
-sysctl -n machdep.cpu.thermal_level >> scratch/regression_NNN_ps.txt
-vm_stat >> scratch/regression_NNN_ps.txt
+ssh runpod 'nvidia-smi' | tee scratch/regression_NNN_gpu.txt
+ssh runpod 'pip show torch | head -5' >> scratch/regression_NNN_gpu.txt
+ssh runpod 'df -h /workspace' >> scratch/regression_NNN_gpu.txt
 ```
 
 Future sessions reading sentinel rows treat surrounding experiments as suspect.
@@ -284,7 +282,7 @@ If you run out of ideas:
 5. Try more radical architectural changes you previously parked.
 6. Re-derive parameter / FLOPs math for the current canonical to find inefficiencies.
 
-Each experiment is ~5 min. Overnight ≈ 80–100 experiments. Even a 1-in-5 hit rate is significant progress. Keep going.
+Experiments are cheap on a single-GPU pod and the rhythm rewards stacking — prep N+1 while N runs (RUNPOD.md §5, `launch-and-await` skill). Even a 1-in-5 hit rate is significant progress. Keep going.
 
 ## When the human returns and explicitly asks you to STOP
 

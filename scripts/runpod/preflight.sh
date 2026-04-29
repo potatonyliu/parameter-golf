@@ -16,9 +16,13 @@
 #   # exits 0 if all checks pass, exits 1 with explanation otherwise.
 #
 # Override checks (use sparingly, document why):
-#   ALLOW_NO_TMUX=1     skip tmux check (e.g., short interactive smoke)
-#   ALLOW_ANY_GPU=1     skip VRAM / GPU type check
-#   ALLOW_LONG_RUN=1    allow MAX_WALLCLOCK_SECONDS > 7200
+#   ALLOW_NO_TMUX=1            skip tmux check (e.g., short interactive smoke)
+#   ALLOW_ANY_GPU=1            skip VRAM / GPU type check
+#   ALLOW_LONG_RUN=1           allow MAX_WALLCLOCK_SECONDS > 7200
+#   ALLOW_NO_WALLCLOCK_CAP=1   allow MAX_WALLCLOCK_SECONDS=0 (sentinel/canonical
+#                              repro only — disabling the cap selects the
+#                              step-based lr_mul branch needed to bit-reproduce
+#                              the MPS canonical schedule)
 
 set -uo pipefail
 
@@ -134,8 +138,12 @@ else
       echo "  ✗ env.sh: MAX_WALLCLOCK_SECONDS unset. ALWAYS set this on RunPod — runaway runs cost \$\$." >&2
       inner_fail=$((inner_fail + 1))
     elif [[ "${MAX_WALLCLOCK_SECONDS}" == "0" ]]; then
-      echo "  ✗ env.sh: MAX_WALLCLOCK_SECONDS=0 disables the wallclock cap. NOT acceptable on RunPod — set a real number (e.g., 1800 for 30 min)." >&2
-      inner_fail=$((inner_fail + 1))
+      if [[ "${ALLOW_NO_WALLCLOCK_CAP:-0}" == "1" ]]; then
+        echo "  ✓ env.sh MAX_WALLCLOCK_SECONDS=0 (overridden by ALLOW_NO_WALLCLOCK_CAP=1 — sentinel/canonical-repro)"
+      else
+        echo "  ✗ env.sh: MAX_WALLCLOCK_SECONDS=0 disables the wallclock cap. NOT acceptable on RunPod — set a real number (e.g., 1800 for 30 min). For sentinel/canonical-repro runs that need the step-based lr_mul branch, set ALLOW_NO_WALLCLOCK_CAP=1 to override." >&2
+        inner_fail=$((inner_fail + 1))
+      fi
     elif (( MAX_WALLCLOCK_SECONDS > 7200 )) && [[ "${ALLOW_LONG_RUN:-0}" != "1" ]]; then
       echo "  ✗ env.sh: MAX_WALLCLOCK_SECONDS=${MAX_WALLCLOCK_SECONDS} > 7200s (2h). Set ALLOW_LONG_RUN=1 if intentional." >&2
       inner_fail=$((inner_fail + 1))
