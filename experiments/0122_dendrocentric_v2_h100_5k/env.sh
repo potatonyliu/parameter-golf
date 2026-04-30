@@ -190,12 +190,14 @@ export DENDRO_TAU_L=1.0
 # 0122 v2 dendrocentric H100 DEPLOY: same submission budget as 0121 Path A, with v2 on.
 # Records anchor: 6240 steps × 96ms/step in 600s on 8×H100 SXM (transformer baseline).
 # v2 is heavier than baseline due to K^2 soft-rank forward (chunked over K=8 in module).
-# Micro-batch on 8×H100 = 524288/world_size_factor (per train_gpt.py grad_accum logic).
-# Predicted step time: 250-400ms on 8×H100 → 1500-2400 steps fit 600s budget.
-# v2 buffer (N, M, K) at micro-batch ~8192 tokens × 2048 × 8 × 4B = 0.5 GB per call;
-# fits 80GB H100 with margin.
-# PARALLEL_RESIDUAL OFF (matches 0121 Path A; not in 0120 base anyway).
-export TRAIN_BATCH_TOKENS=524288
+#
+# Memory math: 8×H100 with 80GB each. At TRAIN_BATCH_TOKENS=524288, world_size=8,
+# grad_accum=1 → per-GPU micro = 65536 tokens. Gathered buffer per layer call:
+# (65536, 2048, 8) × 2B (bf16) = 2 GB. With 5 unique layers × 3 loops = 15 calls,
+# stored activations could approach 30 GB at fp16 — tight. Use 262144 batch to halve
+# this to 15 GB (per-GPU micro = 32768, gathered = 1 GB × 15 = 15 GB).
+# If 262144 OOM-free, can try 524288 in round-3 for more steps in same wallclock.
+export TRAIN_BATCH_TOKENS=262144
 export ITERATIONS=10000
 # EMA β=0.999 for ≥5k training (math: window=1000 ≈ 20% of 5k = late-train weights).
 export EMA_BETA=0.999
