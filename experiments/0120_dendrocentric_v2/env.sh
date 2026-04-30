@@ -187,7 +187,9 @@ export DENDRO_K=8
 export DENDRO_ALPHA=4.0
 export DENDRO_TAU_X=1.0
 export DENDRO_TAU_L=1.0
-# 1k smoke for code-verify; v2 expected ~50% slower than v1's 1051ms/step
-# (extra K^2 sigmoid evals per dendrite).
+# v2's gather buffer (N, M, K) at micro-batch 16384 was 1GB × 15 layers = OOM at
+# 5090 32GB. Drop micro-batch by 4× (16384 → 4096 tokens) so gathered ~256MB.
+# This is code-verify smoke, not throughput-test.
+export TRAIN_BATCH_TOKENS=32768
 export ITERATIONS=1000
 export MAX_WALLCLOCK_SECONDS=2700
