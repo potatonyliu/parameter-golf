@@ -170,3 +170,4 @@ id	parent	val_bpb	pre_quant_bpb	quant_tax	artifact_mb	step_avg_ms	crashed	size_v
 0113_full_sel_rescue_lr_third	0103_ssm_frontier_cuda_2k	1.48983433	1.4882	0.001634	17.649	713.54	false	true	TODO	TODO
 0115_parallel_resid_n5_ternary	0107_bigger_ternary_ssm_prod	1.57224157	1.5719	0.000342	9.161	1348.78	false	false	TODO	TODO
 0116_ema_n5_ternary	0107_bigger_ternary_ssm_prod	2.20220103	2.2033	-0.001099	8.926	1205.30	false	false	TODO	TODO
+0117_dendrocentric_v1_n5_ternary	0107_bigger_ternary_ssm_prod	1.68122564	1.6759	0.005326	8.813	1051.20	false	false	TODO	TODO
