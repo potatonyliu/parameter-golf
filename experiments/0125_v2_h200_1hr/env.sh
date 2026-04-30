@@ -193,7 +193,7 @@ export PARALLEL_LAYER_POSITIONS=0,1,2,3,4,5,6
 # count, but EMA β=0.999 + 5k+ training should compensate via more effective
 # token budget. Net: v2 is a fairer test of the ordering claim.
 export DENDROCENTRIC=1
-export DENDRO_M=1024
+export DENDRO_M=2048
 export DENDRO_K=8
 export DENDRO_ALPHA=4.0
 export DENDRO_TAU_X=1.0
