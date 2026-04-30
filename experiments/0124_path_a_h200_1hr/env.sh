@@ -1,5 +1,5 @@
 # Source this from inside the experiment folder before running.
-export RUN_ID="0121_path_a_h100_5k"
+export RUN_ID="0124_path_a_h200_1hr"
 export DATA_PATH="../../data/datasets/fineweb10B_sp1024"
 export TOKENIZER_PATH="../../data/tokenizers/fineweb_1024_bpe.model"
 export VOCAB_SIZE=1024
@@ -174,21 +174,24 @@ export NUM_UNIQUE_LAYERS=5
 # 0,1,2 covering 3 unique blocks; now we have 5).
 export PARALLEL_LAYER_POSITIONS=0,1,2,3,4
 
-# 0121 PATH A — DE-RISK ROUND 1 on 4×H200 SXM at 600s wallclock.
-# Goal: verify infrastructure + measure actual H200 step time before committing
-# to long-train (0124). Cost: ~$2.66 at $15.96/hr × 600s.
-# Stack: kill-Mamba-2 triple-parallel + n=5 + ternary + brotli (0107) + EMA β=0.999.
-# Predicted step time: 250-400ms on 4×H200; 600s = 1500-2400 steps.
-# val_bpb predicted in [1.30, 1.50] at this token budget (~750M-1.2B tokens).
-# If val ≤1.50, no NaN, no crash → GO Round 2 (0124 3600s long-train).
+# 0124 PATH A LONG-TRAIN ROUND 2 on 4×H200 SXM — non-records-track demonstration.
+# Goal: scale Path A SSM stack to records-class token budget. Per scratch/2026-04-29_
+# record_recipe_analysis.md, "training duration is the dominant gap to records
+# (-0.40 to -0.60 BPB)". Records: 6240 steps × 524288 = 3.27B tokens at 1.1063.
+# Predicted: 9000-14000 steps × 524288 = 4.7-7.3B tokens (1.5-2.2× records' tokens).
+# Predicted post-quant val_bpb [1.15, 1.30].
+# Hardware: 4×H200 SXM, $15.96/hr × 3600s = $16.
+# Gated on: 0121 (Round 1) running cleanly with predictable step time.
+# Peer: non-records "1 Bit Quantization" 1.1239 (Ciprian-Florin Ifrim, 2hr training).
 export EMA_BETA=0.999
 export EMA_WARMUP_OFFSET=
-export ITERATIONS=10000
+# 3600s wallclock; ITERATIONS upper bound to avoid step-exhaustion edge case.
+export ITERATIONS=20000
 export TRAIN_BATCH_TOKENS=524288
-# Warmdown ~15% of expected ~2000 steps → 300.
-export WARMDOWN_ITERS=300
+# Warmdown ≈ 15% of expected ~12000 steps → 1800.
+export WARMDOWN_ITERS=1800
 export LR_WARMUP_STEPS=30
-# Round 1 budget: 600s wallclock for de-risk.
-export MAX_WALLCLOCK_SECONDS=600
-# Full eval for writeup-quality number (called twice: pre-quant + post-quant).
+# 1hr long-train.
+export MAX_WALLCLOCK_SECONDS=3600
+# Full eval (writeup-quality).
 export VAL_TOKENS=0

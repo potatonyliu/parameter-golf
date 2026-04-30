@@ -1,5 +1,5 @@
 # Source this from inside the experiment folder before running.
-export RUN_ID="0121_path_a_h100_5k"
+export RUN_ID="0125_v2_h200_1hr"
 export DATA_PATH="../../data/datasets/fineweb10B_sp1024"
 export TOKENIZER_PATH="../../data/tokenizers/fineweb_1024_bpe.model"
 export VOCAB_SIZE=1024
@@ -36,7 +36,7 @@ export TIED_EMBED_INIT_STD=0.05
 export MUON_BACKEND_STEPS=15
 export TRAIN_BATCH_TOKENS=24576
 export MATRIX_LR=0.045
-export CONTROL_TENSOR_NAME_PATTERNS="attn_scale,attn_scales,mlp_scale,mlp_scales,resid_mix,resid_mixes,q_gain,skip_weight,skip_weights,A_log,A_im,B_proj,C_proj,dt_log,D_skip,dt_bias,delta_bias,conv1d"
+export CONTROL_TENSOR_NAME_PATTERNS="attn_scale,attn_scales,mlp_scale,mlp_scales,resid_mix,resid_mixes,q_gain,skip_weight,skip_weights,A_log,A_im,B_proj,C_proj,dt_log,D_skip,dt_bias,delta_bias,conv1d,dendro_"
 export NUM_UNIQUE_LAYERS=3
 export NUM_LOOPS=3
 export MLP_MULT=8
@@ -135,7 +135,7 @@ export PARALLEL_SSM_TYPE=mamba2_kill
 export MAMBA2_KILL_SELECTIVITY=1
 export BIGRAM_VOCAB_SIZE=0
 # CONTROL_TENSOR_NAME_PATTERNS: SSM frontier set (from 0098), keeps A_log etc fp32:
-export CONTROL_TENSOR_NAME_PATTERNS="attn_scale,attn_scales,mlp_scale,mlp_scales,resid_mix,resid_mixes,q_gain,skip_weight,skip_weights,A_log,A_im,B_proj,C_proj,dt_log,D_skip,dt_bias,delta_bias,conv1d"
+export CONTROL_TENSOR_NAME_PATTERNS="attn_scale,attn_scales,mlp_scale,mlp_scales,resid_mix,resid_mixes,q_gain,skip_weight,skip_weights,A_log,A_im,B_proj,C_proj,dt_log,D_skip,dt_bias,delta_bias,conv1d,dendro_"
 # TRIGRAM_SIDE_MEMORY=0 to skip the build cost and avoid the dynamo bug.
 # Pre-quant val_bpb is what tests the compound; post-quant requires fixing
 # trigram_side_memory.py:634 .item() bug.
@@ -174,21 +174,45 @@ export NUM_UNIQUE_LAYERS=5
 # 0,1,2 covering 3 unique blocks; now we have 5).
 export PARALLEL_LAYER_POSITIONS=0,1,2,3,4
 
-# 0121 PATH A — DE-RISK ROUND 1 on 4×H200 SXM at 600s wallclock.
-# Goal: verify infrastructure + measure actual H200 step time before committing
-# to long-train (0124). Cost: ~$2.66 at $15.96/hr × 600s.
-# Stack: kill-Mamba-2 triple-parallel + n=5 + ternary + brotli (0107) + EMA β=0.999.
-# Predicted step time: 250-400ms on 4×H200; 600s = 1500-2400 steps.
-# val_bpb predicted in [1.30, 1.50] at this token budget (~750M-1.2B tokens).
-# If val ≤1.50, no NaN, no crash → GO Round 2 (0124 3600s long-train).
+# 0120: Dendrocentric v2 — adds DFSM-style stored ordering. Forward computes
+# soft-rank correlation between observed K values and stored per-dendrite
+# permutation L (M, K). Math: scratch/2026-04-30_dendrocentric_v2_derivation.md
+# Toys: scratch/2026-04-30_dendrocentric_v2_tiny.py (all 4 pass).
+# v1 (0117) lost +0.156 — deferred ordering. v2 puts brief's central claim back.
+# 5090 1k smoke is CODE-VERIFY ONLY (per feedback_5090_explore_h100_writeup.md);
+# real test = H100 5k+.
+# Outside-eyes reviewer (2026-04-29 23:11) flagged: at M=2048 + batch=262144, v2 sees
+# half the tokens of Path A (524288 batch) in same 600s wallclock. That confounds
+# v2-mechanism-effect with under-training. Fix: halve M (2048→1024), which halves
+# both gather buffer AND step time, allowing equal batch (524288) and roughly
+# equal step count to Path A. Equal-token comparison with Path A is the cleaner
+# test of the v2 mechanism vs no-v2.
+# Memory: at M=1024, K=8, micro=65536 tokens (524288/8): gather (65536, 1024, 8)
+# × 2B fp16 = 1 GB per layer × 15 calls = 15 GB. Comfortable on 80GB H100.
+# Capacity tradeoff: half the dendrites = roughly half the dendrocentric param
+# count, but EMA β=0.999 + 5k+ training should compensate via more effective
+# token budget. Net: v2 is a fairer test of the ordering claim.
+export DENDROCENTRIC=1
+export DENDRO_M=1024
+export DENDRO_K=8
+export DENDRO_ALPHA=4.0
+export DENDRO_TAU_X=1.0
+export DENDRO_TAU_L=1.0
+export TRAIN_BATCH_TOKENS=524288
+# 0125 v2 LONG-TRAIN ROUND 3 on 4×H200 — brief-test at fair token budget.
+# Same training duration as 0124 Path A so v2-vs-Path A comparison is clean
+# (apples-to-apples token budget). Cost: ~$16 at $15.96/hr × 3600s.
+# Predicted: at 9000-14000 steps × 524288 = 4.7-7.3B tokens, with M=1024 K=8
+# DFSM-trained ordering, ordering claim has chance to express itself if it
+# matters. Predicted post-quant val_bpb [Path A − 0.05, Path A + 0.10].
+export ITERATIONS=20000
+# EMA β=0.999 for long-train (window=1000 ≈ 8-12% of 9k-14k steps = late-train).
 export EMA_BETA=0.999
 export EMA_WARMUP_OFFSET=
-export ITERATIONS=10000
-export TRAIN_BATCH_TOKENS=524288
-# Warmdown ~15% of expected ~2000 steps → 300.
-export WARMDOWN_ITERS=300
+# Warmdown ≈ 15% of expected ~12000 steps → 1800.
+export WARMDOWN_ITERS=1800
 export LR_WARMUP_STEPS=30
-# Round 1 budget: 600s wallclock for de-risk.
-export MAX_WALLCLOCK_SECONDS=600
-# Full eval for writeup-quality number (called twice: pre-quant + post-quant).
+# Full eval for writeup-quality numbers.
 export VAL_TOKENS=0
+# 1hr long-train (matches 0124 Path A; equal-token comparison).
+export MAX_WALLCLOCK_SECONDS=3600
