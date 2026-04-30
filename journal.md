@@ -94,3 +94,25 @@
 
 ## Entries (newest first)
 
+## 2026-04-29 22:30 EDT · session start (deadline 2026-04-30 afternoon)
+
+**Status**: Fresh agent picked up handoff. Brief partially disproved on v1 simplifications (0117/0118). Need v2 + Path A H100 deploy in ~16h. 5090 alive billing-by-time.
+
+**Plan**: see `scratch/2026-04-30_deadline_plan.md` and `scratch/2026-04-30_h100_deploy_playbook.md`.
+
+**Phase A — Build v2 dendrocentric** (in progress):
+- Math derivation: `scratch/2026-04-30_dendrocentric_v2_derivation.md` (DFSM-style soft-rank correlation, K² cost, Pearson normalization s ∈ [-1,+1])
+- 4 progressive toys all PASS: numerical sanity, Pearson normalization, DFSM gradient (L converges to score>0.95 on target perm), full-block training (loss reduces 4× on synthetic)
+- Module: `experiments/0120_dendrocentric_v2/modules/dendrocentric.py` (chunked over K to avoid OOM on the (N, M, K, K) intermediate buffer)
+- 5090 1k smoke launched. Step 245/1000 train_loss 3.93, step_avg 2.17s. Will finish ~03:20 EDT.
+
+**Phase B+ — H100 deploy folders ready** (committed, pushed):
+- 0121 Path A insurance: kill-Mamba-2 triple-parallel + n=5 + ternary + EMA β=0.999, 600s budget on 8×H100
+- 0122 v2 dendrocentric: same stack + v2 mechanism on, 600s budget on 8×H100
+- PARALLEL_RESIDUAL deliberately OFF (0119 base lacks code path; defer port to round-3 if rounds 1+2 encouraging)
+
+**Records anchor (verified)**: track_10min_16mb/2026-03-31, 6240 steps × 96ms/step on 8×H100 SXM transformer = 1.1063 BPB. Our SSM stack heavier (~2-3×) — predicted 2000-4000 steps in 600s, val_bpb 1.20-1.45.
+
+**H100 cost predicted**: $5-6 per submission attempt; budget for 2-3 attempts = $10-18.
+
+
