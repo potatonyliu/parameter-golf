@@ -101,25 +101,37 @@ class DendrocentricLayer(nn.Module):
         w_at_topk = torch.gather(W_d_sparse, dim=-1, index=topk_idx)  # (M, K)
         weighted = gathered * w_at_topk.unsqueeze(0)  # (N, M, K)
 
-        # Soft-rank of K weighted values per dendrite (in fp32 for numerical stability).
-        weighted_f = weighted.to(torch.float32)
-        diff = weighted_f.unsqueeze(-1) - weighted_f.unsqueeze(-2)  # (N, M, K, K)
-        sig = torch.sigmoid(self.tau_x * diff)
-        eye = torch.eye(self.K, device=x.device, dtype=sig.dtype)
-        sig = sig * (1.0 - eye)
-        r = sig.sum(dim=-1)  # (N, M, K)
-
-        # Soft-rank of stored L (also fp32; dendro_L is fp32-protected via 'dendro_' substring).
+        # Soft-rank of stored L first (small: shape (M, K, K) fp32). Reused across all tokens.
         L = self.dendro_L.to(torch.float32)
         L_diff = L.unsqueeze(-1) - L.unsqueeze(-2)  # (M, K, K)
         L_sig = torch.sigmoid(self.tau_l * L_diff)
-        L_sig = L_sig * (1.0 - eye)
+        eye_L = torch.eye(self.K, device=L.device, dtype=L_sig.dtype)
+        L_sig = L_sig * (1.0 - eye_L)
         rho = L_sig.sum(dim=-1)  # (M, K)
+        rho_c = rho - self._rank_center  # (M, K) fp32
 
-        # Centered Pearson correlation s ∈ [-1, +1].
-        r_c = r - self._rank_center  # (N, M, K)
-        rho_c = rho - self._rank_center  # (M, K)
-        dot = (r_c * rho_c.unsqueeze(0)).sum(dim=-1)  # (N, M)
+        # Soft-rank of K weighted values per dendrite, fused into score to avoid
+        # materializing (N, M, K, K) intermediate. We need:
+        #   r_c[n, m, k] = sum_{l != k} sigmoid(tau_x * (w[n,m,k] - w[n,m,l])) - (K-1)/2
+        # And:
+        #   dot[n, m] = sum_k r_c[n, m, k] * rho_c[m, k]
+        # We reorder: dot = sum_k rho_c[m,k] * (sum_{l != k} sigma_kl - (K-1)/2)
+        #               = sum_k rho_c[m,k] * (sum_{l != k} sigma_kl) - (K-1)/2 * sum_k rho_c[m,k]
+        # The second term vanishes since sum(rho_c) = 0 (rho centered, sum unchanged).
+        # First term computed by chunking over k to keep peak memory at (N, M, K) per chunk.
+        weighted_f = weighted.to(torch.float32)  # (N, M, K)
+        # Use sum over l of sigmoid(tau * (w_k - w_l)). We can pre-broadcast diff and sum:
+        # dot[n,m] = sum_k rho_c[m,k] * (sum_{l != k} sigmoid(tau * (w_k - w_l)))
+        # where (w_k - w_l) for fixed k: shape (N, M, K). Looping over k is K=8 forward passes.
+        dot = torch.zeros(weighted_f.shape[0], weighted_f.shape[1], device=x.device, dtype=torch.float32)
+        for k in range(self.K):
+            # diff_k[n, m, l] = w_f[n, m, k] - w_f[n, m, l]
+            diff_k = weighted_f[..., k:k + 1] - weighted_f  # (N, M, K)
+            # Sum sigmoid(diff) over all l, then subtract self-term sigmoid(0) = 0.5.
+            sig_sum_k = torch.sigmoid(self.tau_x * diff_k).sum(dim=-1) - 0.5  # (N, M)
+            r_c_k = sig_sum_k - self._rank_center
+            dot = dot + r_c_k * rho_c[:, k]  # broadcast (N, M) * (M,)
+
         s = dot / self._pearson_norm  # (N, M)
 
         # NMDA-like sigmoid activation with per-dendrite theta bias.
