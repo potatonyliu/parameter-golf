@@ -67,7 +67,33 @@ Untested levers from 2026-04-29 session (worth picking up):
 - **Rank-coded with FULL permutation storage (R=8 token indices, not template override)**: 0095 tested only the decode-semantics form (Option 3). Full storage-density form needs subagent build.
 - **0084 long-kernel conv1d at H100 20k**: regressed at MPS 200 (kernel=4 saturated) but might help at H100 with more training.
 
-**Next session FIRST ACTION (updated 2026-04-29 CUDA session end)**: Run noise-floor-sentinel on the **0107/0108 config** (NUM_UNIQUE_LAYERS=5 + ternary + production batch 131072 + canonical LR 0.045 + 1000 steps). 3 SEEDS (1337 already as 0107, 42 already as 0108, add 2024). σ-anchored thresholds for the family unblock the promote of 0107/0108-like winners. Expected ~36 min total (just the third seed = 0110). After sentinel: invoke `promote` skill on the 3-seed mean (likely beats prior winner 1.95141 by ~0.43 BPB; promoted artifact ~9 MB). Then run the 25-30k step long-training experiment on the SSM frontier no-ternary stack at production batch (~3h on 5090) — predicted val_bpb 1.20-1.25, closes most of the gap to the SP1024 records (1.1063). Tier-1 standard-stack ports (parallel residuals, EMA) are subagent-ready in `scratch/2026-04-30_next_session_plan.md`.
+**SESSION HEADLINE PART 2 (2026-04-29 ~17:00-21:00 EDT)**: Three streams of work, all infrastructure-verified for H100 deploy:
+
+(1) **Mechanism cluster (0111-0113) — three confirmed staycourse signals** [n=1 each, all Δ ≥ 13σ above family noise floor]:
+- 0111 NUM_UNIQUE_LAYERS=7 + ternary at production-1k: post 1.5536 / 12.05 MB / step 1888ms. Δ +0.030 vs 0107/0108 mean. **Depth ceiling at production-1k is n=5**; bigger model under-trains at fixed step budget. Untested at 5k+ steps.
+- 0112 MAMBA2_KILL_SCAN ablation (conv1d only, no SSD scan): post 1.5049 / 22.07 MB / step 581ms. Δ +0.046 vs 0103. **The SSD scan IS load-bearing at production scale (-0.046 BPB)**. Falsifies "conv1d does the work" walk hypothesis. Combined with 0109 (-0.011 net SSM contribution): scan helps -0.046, conv1d-without-scan hurts +0.035.
+- 0113 full-selectivity rescue at MATRIX_LR=0.015 (canonical/3): post 1.4898 / 17.65 MB / step 714ms. Δ +0.031 vs 0103 kill. **kill > full architectural, NOT LR-cliff artifact**. _B_const/_C_const LTI prior beats input-dependent dt/B/C from in_proj at 1k steps.
+
+(2) **Tier-1 record-validated ports — H100-bound, training-duration-confounded at 1k smoke**:
+- 0115 parallel-residuals (PARALLEL_RESIDUAL=1, partition layer 10 of 15): post 1.5722 / 12.05 MB / step 1349ms. Δ +0.047 vs 0107. The +x_split offset at merge boundary requires longer training to learn-around. Records' gain is at H100 6k+ steps.
+- 0116 EMA-of-weights at β=0.999: post **2.2022** / 8.93 MB / step 1205ms. β=0.999 wrong for 1k smoke (effective window=1000 steps = entire training, shadow lags to near-init weights — predicted in `scratch/2026-04-29_ema_derivation.md`). EMA INFRASTRUCTURE works (no NaN, swap + quant export both run cleanly); β=0.99 (window=100) would be the correct hyperparameter at our 1k regime; β=0.999 IS correct for H100 5k+. To re-disambiguate: β=0.99 re-run = ~22 min, $0.40, first-action next session.
+
+(3) **Bold novel mechanisms (brief options c + f) — infrastructure ready, smoke results pending/landed**:
+- 0117 dendrocentric v1 (replace SwiGLU MLP with sparse-selection dendrite bank, M=2048, K=8, top-K STE, sigmoidal NMDA): post **1.6812** / 8.81 MB / step 1051ms (28% faster than dense MLP per prediction). Δ +0.156 vs 0107. **Materially worse at 1k.** Two candidate interpretations: (a) training-duration-bound (matches 5 prior dendritic-family neutral pattern; sparse pattern needs more steps to fixate); (b) v1 mechanism wrong because it strips the brief's actual ordering claim. v2 (with order-sensitivity via DFSM-style trainability bridge) is the brief-aligned next swing.
+- 0118 spike-rank embedding v1 (sparse tok_emb, K=8 nonzeros per token via top-K STE): RUNNING.
+
+**Best submittable result of session unchanged**: 0107/0108 2-seed mean **1.5232** at 9.0 MB. NOT promoted (no 3rd-seed sentinel; sentinel skipped per user feedback "no σ-confirms on cheap pod, deltas don't transfer to H100").
+
+**Cumulative cost today**: ~$8 of pod time (5h yesterday + ~3.5h today, ~10 experiments).
+
+**Next session FIRST ACTION (updated 2026-04-29 ~21:00 EDT)**: Move to H100 deploy. The 5090 has done its job (mechanism + cap-frontier confirmed; tier-1 + novel mechanisms infrastructure verified). Recipe for H100:
+- Base stack: kill-Mamba-2 triple-parallel + ternary + n=5 + production-batch (scale to ~524288 on 8×H100) + brotli
+- Add: EMA at β=0.999 (correct hyperparameter for 5k+ steps); parallel-residuals (records' merge offset learned over longer training)
+- Toggle: dendrocentric v1 only if cap budget needs it (saves ~1.5 MB vs MLP); spike-rank embed only if cap budget needs it
+- Steps: 20-30k — H100 records at 6k beat us at 1k by 0.4 BPB; another 5x training puts us in record territory
+- First H100 experiment: pure stack (no novel mechanisms) at 5k steps — establish H100 baseline. Then add ports one at a time. Decision tree per `scratch/2026-04-29_post_chain_decision_tree.md` (now stale — write new based on 0117/0118 results).
+
+**Bold for next session**: build dendrocentric v2 with DFSM-style ordering. The brief's actual question. ~200-300 line subagent. Math + temporal-rank capacity sim already in scratch from prior session.
 
 
 
