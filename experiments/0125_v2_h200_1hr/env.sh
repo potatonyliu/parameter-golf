@@ -192,6 +192,7 @@ export PARALLEL_LAYER_POSITIONS=0,1,2,3,4,5,6
 # Capacity tradeoff: half the dendrites = roughly half the dendrocentric param
 # count, but EMA β=0.999 + 5k+ training should compensate via more effective
 # token budget. Net: v2 is a fairer test of the ordering claim.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export DENDROCENTRIC=1
 export DENDRO_M=2048
 export DENDRO_K=8
