@@ -2,8 +2,25 @@
   "id": "0119_ema_n5_ternary_beta99",
   "parent": "0116_ema_n5_ternary",
   "created_at": "2026-04-30T01:27:03Z",
-  "metrics": null,
-  "flags": {},
+  "metrics": {
+    "val_bpb_pre_quant": 1.5465,
+    "val_bpb_post_quant": 1.54697933,
+    "val_loss_pre_quant": 2.6432,
+    "val_loss_post_quant": 2.64399076,
+    "quant_tax": 0.000479,
+    "step_avg_ms": 1198.87,
+    "num_steps": 1000.0,
+    "artifact_bytes": 8985733.0,
+    "artifact_mb": 8.986,
+    "code_bytes": 104676.0,
+    "compression_ratio": 7.62
+  },
+  "flags": {
+    "crashed": false,
+    "size_violation": false,
+    "has_nan": false,
+    "exit_code": 0
+  },
   "status": null,
   "description": null
 }
