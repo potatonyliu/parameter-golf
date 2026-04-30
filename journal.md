@@ -74,6 +74,21 @@
 
 **Bold-but-careful for next session**: Build dendrocentric v2 with DFSM-style ordering. The brief's actual question. Math + temporal-rank capacity sim in `scratch/_archive_prior_sessions/`. The cheap 0116 EMA β=0.99 re-run (~22 min, $0.40) is worth doing first to verify infrastructure.
 
+## DEADLINE NOTICE (added at 2026-04-29 ~22:30 EDT, post-wrap)
+
+**Project deadline: 2026-04-30 afternoon** — must ship working H100 submission (leaderboard or non-record). Handing to fresh agent next session. See:
+- `scratch/2026-04-29_handoff_to_fresh_agent.md` — full state, what's done, deadline plan
+- `scratch/2026-04-30_fresh_agent_prompt.md` — opening prompt (paste verbatim to fresh agent)
+
+**Latest experiment**: 0119 EMA β=0.99 re-run — post-quant **1.5470** (Δ +0.021 vs 0107). **EMA infrastructure VERIFIED CORRECT.** 0116's val 2.20 was math-predicted hyperparameter mismatch (β=0.999 + 1k = full-window lag), not a bug. β=0.999 at H100 5k+ is the correct deploy hyperparameter.
+
+**Status of brief's claims at 1k smoke**:
+- v1 dendrocentric (no ordering): val 1.6812 — disproves "K-sparse compute density alone helps." Brief's ORDERING claim untested.
+- v1 spike-rank (K=8 dense storage): val 1.8849 — disproves "K=8 sparse-only embed helps." Brief's CAP-DENSITY claim untestable in this implementation.
+- **Brief partially disproved on v1 simplifications; v2/v1.5 with the brief's ACTUAL claims (DFSM ordering, K=32 + sparse storage) NOT YET BUILT.** This is the deadline session's primary task.
+
+**Pod state**: 5090 alive, idle since 0119 finished. Recommend stopping before fresh agent starts to avoid overnight idle billing (~$12).
+
 
 
 
