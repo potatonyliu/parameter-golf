@@ -181,23 +181,24 @@ export PARALLEL_LAYER_POSITIONS=0,1,2,3,4
 # v1 (0117) lost +0.156 — deferred ordering. v2 puts brief's central claim back.
 # 5090 1k smoke is CODE-VERIFY ONLY (per feedback_5090_explore_h100_writeup.md);
 # real test = H100 5k+.
+# Outside-eyes reviewer (2026-04-29 23:11) flagged: at M=2048 + batch=262144, v2 sees
+# half the tokens of Path A (524288 batch) in same 600s wallclock. That confounds
+# v2-mechanism-effect with under-training. Fix: halve M (2048→1024), which halves
+# both gather buffer AND step time, allowing equal batch (524288) and roughly
+# equal step count to Path A. Equal-token comparison with Path A is the cleaner
+# test of the v2 mechanism vs no-v2.
+# Memory: at M=1024, K=8, micro=65536 tokens (524288/8): gather (65536, 1024, 8)
+# × 2B fp16 = 1 GB per layer × 15 calls = 15 GB. Comfortable on 80GB H100.
+# Capacity tradeoff: half the dendrites = roughly half the dendrocentric param
+# count, but EMA β=0.999 + 5k+ training should compensate via more effective
+# token budget. Net: v2 is a fairer test of the ordering claim.
 export DENDROCENTRIC=1
-export DENDRO_M=2048
+export DENDRO_M=1024
 export DENDRO_K=8
 export DENDRO_ALPHA=4.0
 export DENDRO_TAU_X=1.0
 export DENDRO_TAU_L=1.0
-# 0122 v2 dendrocentric H100 DEPLOY: same submission budget as 0121 Path A, with v2 on.
-# Records anchor: 6240 steps × 96ms/step in 600s on 8×H100 SXM (transformer baseline).
-# v2 is heavier than baseline due to K^2 soft-rank forward (chunked over K=8 in module).
-#
-# Memory math: 8×H100 with 80GB each. At TRAIN_BATCH_TOKENS=524288, world_size=8,
-# grad_accum=1 → per-GPU micro = 65536 tokens. Gathered buffer per layer call:
-# (65536, 2048, 8) × 2B (bf16) = 2 GB. With 5 unique layers × 3 loops = 15 calls,
-# stored activations could approach 30 GB at fp16 — tight. Use 262144 batch to halve
-# this to 15 GB (per-GPU micro = 32768, gathered = 1 GB × 15 = 15 GB).
-# If 262144 OOM-free, can try 524288 in round-3 for more steps in same wallclock.
-export TRAIN_BATCH_TOKENS=262144
+export TRAIN_BATCH_TOKENS=524288
 export ITERATIONS=10000
 # EMA β=0.999 for ≥5k training (math: window=1000 ≈ 20% of 5k = late-train weights).
 export EMA_BETA=0.999
