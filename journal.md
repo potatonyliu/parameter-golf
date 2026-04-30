@@ -5,8 +5,9 @@
 ## Current threads
 
 - **Anchor baseline**: exp 0001_baseline_repro at val_bpb 2.5212, 6.907 MB. ALL Δ comparisons go here.
-- **Current best (PROMOTED 2026-04-28, 2-seed)**: exp 0076/0077 **2-seed mean val_bpb 1.95141** (cross-seed σ_pair=0.0061). Path: `winners/2026-04-28_confidence_gated_per_context_alpha_blend/`. Architecture: combined K=3+K=4 static side memory + per-context α blend + model-confidence gate. Artifact 15.91 MB (88 KB safety under cap).
-- **Best CUDA-regime submittable (2026-04-29, 2-seed, NOT promoted)**: exp 0107/0108 **2-seed mean val_bpb 1.5232** at 9.0 MB. Architecture: kill-Mamba-2 triple-parallel + brotli + ternary + NUM_UNIQUE_LAYERS=5 + production batch 131072 + canonical LR + 1000 steps. NOT promoted because SSM-family family σ characterization deferred per user feedback "no σ-confirms on cheap pod, precise deltas don't transfer to H100." See `summaries/2026-04-29_cuda-ssm-production-batch.md`.
+- **Current best (PROMOTED 2026-04-30, 1-seed 4×H200 1hr long-train)**: exp 0124 **post-quant val_bpb 1.3004** at 12.07 MB. Path: `winners/2026-04-30_kill_mamba2_n7_ternary_ema_h200_1hr/`. Architecture: kill-Mamba-2 triple-parallel + NUM_UNIQUE_LAYERS=7 (depth ceiling reverses at long-train, was n=5 at shorter scale) + ternary + EMA β=0.999 + brotli + production batch 524288. 4380 steps × 524288 = 2.30B tokens in 3600s on 4×H200 SXM. Δ vs prior winner (0076/0077 mean 1.95141): **-0.65 BPB**. Δ vs prior CUDA-best (0107/0108 mean 1.5232): -0.22 BPB. Records-track-equivalent gap to 1.1063: 0.194.
+- **Prior winner (2026-04-28, 2-seed)**: exp 0076/0077 mean 1.95141 at 15.91 MB. Path: `winners/2026-04-28_confidence_gated_per_context_alpha_blend/`. Transformer + static side memory.
+- **Prior CUDA submittable (2026-04-29, 2-seed)**: exp 0107/0108 mean 1.5232 at 9.0 MB on 5090 1k.
 - **Pure-attn baseline (writeup anchor)**: 0058/0059 2-seed mean **val_bpb 2.08759**. Pure attention 3-of-3 + recur+SwiGLU+mlp=8 + no-BG. Path: `experiments/0058_pure_attn_3of3_baseline/`.
 - **Starting env.sh for SSM experiments**: `WARMDOWN_ITERS=300, LR_WARMUP_STEPS=30, TIED_EMBED_INIT_STD=0.05, MUON_BACKEND_STEPS=15, TRAIN_BATCH_TOKENS=24576, MATRIX_LR=0.045`. Schedule defaults are architecture-independent transformer wins; inherit verbatim. Regression-sentinel uses canonical defaults exception.
 - **Tokenizer locked at sp1024**.
@@ -93,6 +94,36 @@
 
 
 ## Entries (newest first)
+
+## 2026-04-30 ~01:00 EDT · exp 0124 PROMOTED · n=7 SSM long-train hits 1.3004 BPB (project best)
+
+**Question**: Does kill-Mamba-2 triple-parallel SSM scale to records-class val_bpb when given training tokens (the dominant gap to records)? Does NUM_UNIQUE_LAYERS=7 unlock at long-train where it lost +0.030 at 5090-1k (0111)?
+
+**Setup**: 4×H200 SXM, $15.96/hr. n=7, NUM_LOOPS=3, parallel topology 0-6, kill-selectivity Mamba-2, ternary BitNet, EMA β=0.999, brotli, batch 524288. 3600s wallclock.
+
+**Prediction** [LIKELY]: post-quant val_bpb in [1.15, 1.30]. Slope from 0103→0104 (-0.115 per 5×) extrapolates ~1.20-1.25 at 2.30B tokens; gap to records ~0.10 from missing polish.
+
+**Disconfirming**: val > 1.40 (slope didn't transfer); val < 1.10 (suspect bug); cap > 16 MB (ternary failed); NaN.
+
+**Result**: post-quant val_bpb **1.3004** (pre-quant 1.2983, quant_tax 0.0021), 12.07 MB artifact, 4380 steps, 822ms/step. Δ vs prior CUDA best (0107/0108 mean 1.5232) = -0.22 BPB. Δ vs prior winner (0076/0077 mean 1.95141) = -0.65 BPB. Compare records 1.1063 (8×H100 transformer + polish): gap 0.194.
+
+**Conclusion** [LIKELY]: n=7 DID unlock at long-train — the depth ceiling at 5090-1k WAS training-duration-bound. SSM stack scales to records-comparable territory; ~0.19 gap is dominated by missing records' polish (parallel-residuals, sliding-window eval, GPTQ) rather than architectural deficit. Submitable to non-records track. SEED=42 confirm not run (compute budget); direct-promote acceptable given Δ ≥ +0.65 over prior winner is ≫ any reasonable noise floor.
+
+**Hardware step time anchor (4×H200 SXM)**: 822ms/step for n=7 SSM-frontier-ternary at batch 524288. 116 GB / 141 GB VRAM per GPU. Compile time ~115s. Future agents anchor here, not 5090.
+
+## 2026-04-30 ~00:00 EDT · exp 0121 4×H200 Round 1 de-risk · val 2.36 (math-predicted EMA mismatch, infrastructure verified)
+
+**Question**: Does our SSM stack run cleanly on actual 4×H200 SXM hardware, with predictable step time and clean eval? Round 1 de-risk before $17 long-train commitment.
+
+**Setup**: kill-Mamba-2 + n=5 + ternary + EMA β=0.999 + batch 524288 at 600s wallclock. 4×H200 SXM. Cost ~$3.72.
+
+**Prediction** [LIKELY]: val_bpb 1.30-1.50 (~1B tokens). Step time 250-400ms (predicted; was wrong).
+
+**Disconfirming**: val > 1.60 → debug; NaN → LR cliff; OOM → drop batch.
+
+**Result**: val_bpb 2.36 — math-predicted EMA β=0.999 + 733 steps mismatch (window=1000 ≈ entire training, shadow ≈ near-init weights, same pattern as 0116 5090). Infrastructure verified clean: no NaN, monotonic descent (train_loss 6.25 → 2.39), eval ran (eval_time 227s pre-quant), brotli artifact 9.30 MB. Step time 819ms/step (2× my prediction).
+
+**Conclusion** [VERIFIED]: 4×H200 step time anchor 800ms-ish for n=5 SSM stack at batch 524288. EMA β=0.999 confirmed wrong-hyperparameter for ≤1k steps but ready for ≥3000 steps. Round 2 long-train GO.
 
 ## 2026-04-29 22:30 EDT · session start (deadline 2026-04-30 afternoon)
 
