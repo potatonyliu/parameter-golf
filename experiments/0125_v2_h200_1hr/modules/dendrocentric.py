@@ -110,28 +110,21 @@ class DendrocentricLayer(nn.Module):
         rho = L_sig.sum(dim=-1)  # (M, K)
         rho_c = rho - self._rank_center  # (M, K) fp32
 
-        # Soft-rank of K weighted values per dendrite, fused into score to avoid
-        # materializing (N, M, K, K) intermediate. We need:
-        #   r_c[n, m, k] = sum_{l != k} sigmoid(tau_x * (w[n,m,k] - w[n,m,l])) - (K-1)/2
-        # And:
-        #   dot[n, m] = sum_k r_c[n, m, k] * rho_c[m, k]
-        # We reorder: dot = sum_k rho_c[m,k] * (sum_{l != k} sigma_kl - (K-1)/2)
-        #               = sum_k rho_c[m,k] * (sum_{l != k} sigma_kl) - (K-1)/2 * sum_k rho_c[m,k]
-        # The second term vanishes since sum(rho_c) = 0 (rho centered, sum unchanged).
-        # First term computed by chunking over k to keep peak memory at (N, M, K) per chunk.
+        # Soft-rank of K weighted values per dendrite. UNFUSED single-tensor version
+        # (faster than chunking over K because it avoids 8 sequential GPU kernel
+        # launches per layer; torch.compile can't fuse a Python `for` loop).
+        # Memory: (N, M, K, K) × 2B fp16 ≈ 2 GB at M=1024 N=16384 K=8 — fits.
+        # If OOM: drop M, drop batch, or reintroduce chunking.
         weighted_f = weighted.to(torch.float32)  # (N, M, K)
-        # Use sum over l of sigmoid(tau * (w_k - w_l)). We can pre-broadcast diff and sum:
-        # dot[n,m] = sum_k rho_c[m,k] * (sum_{l != k} sigmoid(tau * (w_k - w_l)))
-        # where (w_k - w_l) for fixed k: shape (N, M, K). Looping over k is K=8 forward passes.
-        dot = torch.zeros(weighted_f.shape[0], weighted_f.shape[1], device=x.device, dtype=torch.float32)
-        for k in range(self.K):
-            # diff_k[n, m, l] = w_f[n, m, k] - w_f[n, m, l]
-            diff_k = weighted_f[..., k:k + 1] - weighted_f  # (N, M, K)
-            # Sum sigmoid(diff) over all l, then subtract self-term sigmoid(0) = 0.5.
-            sig_sum_k = torch.sigmoid(self.tau_x * diff_k).sum(dim=-1) - 0.5  # (N, M)
-            r_c_k = sig_sum_k - self._rank_center
-            dot = dot + r_c_k * rho_c[:, k]  # broadcast (N, M) * (M,)
+        diff = weighted_f.unsqueeze(-1) - weighted_f.unsqueeze(-2)  # (N, M, K, K)
+        sig = torch.sigmoid(self.tau_x * diff)
+        eye_x = torch.eye(self.K, device=x.device, dtype=sig.dtype)
+        sig = sig * (1.0 - eye_x)
+        r = sig.sum(dim=-1)  # (N, M, K)
+        r_c = r - self._rank_center  # (N, M, K)
 
+        # Centered Pearson correlation s ∈ [-1, +1].
+        dot = (r_c * rho_c.unsqueeze(0)).sum(dim=-1)  # (N, M)
         s = dot / self._pearson_norm  # (N, M)
 
         # NMDA-like sigmoid activation with per-dendrite theta bias.
