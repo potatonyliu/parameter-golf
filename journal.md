@@ -100,19 +100,51 @@
 
 **Plan**: see `scratch/2026-04-30_deadline_plan.md` and `scratch/2026-04-30_h100_deploy_playbook.md`.
 
-**Phase A — Build v2 dendrocentric** (in progress):
+**Phase A — Build v2 dendrocentric** (DONE):
 - Math derivation: `scratch/2026-04-30_dendrocentric_v2_derivation.md` (DFSM-style soft-rank correlation, K² cost, Pearson normalization s ∈ [-1,+1])
 - 4 progressive toys all PASS: numerical sanity, Pearson normalization, DFSM gradient (L converges to score>0.95 on target perm), full-block training (loss reduces 4× on synthetic)
 - Module: `experiments/0120_dendrocentric_v2/modules/dendrocentric.py` (chunked over K to avoid OOM on the (N, M, K, K) intermediate buffer)
-- 5090 1k smoke launched. Step 245/1000 train_loss 3.93, step_avg 2.17s. Will finish ~03:20 EDT.
+- 5090 1k smoke: post-quant val_bpb 1.8978 / 6.18 MB / step 1549ms; CODE-VERIFY CLEAN
 
-**Phase B+ — H100 deploy folders ready** (committed, pushed):
-- 0121 Path A insurance: kill-Mamba-2 triple-parallel + n=5 + ternary + EMA β=0.999, 600s budget on 8×H100
-- 0122 v2 dendrocentric: same stack + v2 mechanism on, 600s budget on 8×H100
-- PARALLEL_RESIDUAL deliberately OFF (0119 base lacks code path; defer port to round-3 if rounds 1+2 encouraging)
+**Phase B+ — H100 deploy folders ready, then 4×H200 reality** (DONE):
+- 0121 Path A insurance: kill-Mamba-2 triple-parallel + n=5 + ternary + EMA β=0.999
+- 0122 v2 dendrocentric: same stack + v2 mechanism on (ended up not running this — 0125 took the role)
+- 0123 transformer anchor: pure-attn calibration, NOT RUN (deferred per time budget)
+- 0124 Path A long-train n=7 + EMA β=0.999 at 4×H200 1hr (Round 2)
+- 0125 v2 long-train n=7 + EMA β=0.999 at 4×H200 1hr (Round 3, NOT RUN tonight)
 
-**Records anchor (verified)**: track_10min_16mb/2026-03-31, 6240 steps × 96ms/step on 8×H100 SXM transformer = 1.1063 BPB. Our SSM stack heavier (~2-3×) — predicted 2000-4000 steps in 600s, val_bpb 1.20-1.45.
+## 2026-04-29 23:47 → 2026-04-30 ~01:00 EDT · 4×H200 SXM deploy session
 
-**H100 cost predicted**: $5-6 per submission attempt; budget for 2-3 attempts = $10-18.
+**Hardware**: 4×H200 SXM, $15.96/hr. NPROC=4 (launch_h100.sh constraint: 8 % NPROC == 0).
+
+**Track decision**: NON-RECORDS-TRACK. Records require 600s on 8×H100 SXM, unattainable on 4 GPUs. Project README explicitly supports non-records track for "weird & creative ideas." Peer entry: "1 Bit Quantization 1.1239 (2hr training)" by Ciprian-Florin Ifrim.
+
+**Round 1 (0121, n=5, 600s, $3.72)**: post-quant val_bpb **2.36** at 9.3 MB. EMA β=0.999 + ~733 steps means window=1000 ≈ entire training → shadow ≈ near-init. **Math-predicted, NOT a bug** (same pattern as 0116). Infrastructure verified clean (no NaN, monotonic descent, eval ran). Step time anchor: ~530ms/step at n=5 on 4×H200 batch 524288.
+
+**Round 2 (0124, n=7 BUMPED, 3600s, ~$17)**: long-train. NUM_UNIQUE_LAYERS=5→7 to test "depth ceiling reverses at long-train" hypothesis (journal note from 0111). Cap math: 9.3 MB × 7/5 = 12.5 MB (under cap). Step time ~830ms (1.4× n=5's 530ms). Predicted ~4600 steps × 524288 = 2.4B tokens (~70% records' 3.27B). val_bpb TBD (run still completing as of session wrap).
+
+**Bug caught + fixed**: PARALLEL_LAYER_POSITIONS cascade in env.sh — when bumping NUM_UNIQUE_LAYERS=7, MUST update `=0,1,2,3,4,5,6` AND remove the prior `=0,1,2,3,4` line (bash later-export-wins). Lost ~3 min relaunching.
+
+**Hardware step time anchor (CRITICAL for future deploys)**: 4×H200 SXM, n=7 SSM-frontier-ternary, batch 524288:
+- model_params: 62M (vs 5090's 23M for similar config; **5090 model_params count IS NOT trustworthy for H200** — re-anchor)
+- step_avg: ~830ms
+- VRAM: 116 GB / 141 GB per GPU (~82%)
+- compile time: ~115s
+
+**Round 3 (0125, v2 dendrocentric n=7 1hr)**: STAGED, NOT RUN. Tony stopped session after Round 2.
+
+**Open questions for next session**:
+1. Did n=7 unlock at long-train (Round 2 result)?
+2. Does v2 dendrocentric ordering help at fair conditions (Round 3 future test)?
+3. Could we add records' polish (parallel-residuals, sliding-window eval) in a Round 4?
+4. Could we test BitNet b1 (true binary) as the most-brief-aligned mechanism we haven't built?
+
+**Walk + outside-eyes outputs**:
+- `walks/2026-04-29_2308.md` — pre-deploy walk (M=1024 reasoning, transformer-anchor as contingency)
+- `walks/2026-04-30_0043.md` — mid-Round-2 walk (BitNet b1 worth-testing, H200 step time calibration)
+
+**Handoff doc for next agent**: `scratch/2026-04-30_handoff_to_next_agent.md` — comprehensive briefing on what to do tomorrow.
+
+**Submission template**: `scratch/2026-04-30_submission_readme_template.md` — ready to fill in once Round 2/3 numbers land.
 
 
