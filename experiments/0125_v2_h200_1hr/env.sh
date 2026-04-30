@@ -218,4 +218,4 @@ export LR_WARMUP_STEPS=30
 # Full eval for writeup-quality numbers.
 export VAL_TOKENS=0
 # 1hr long-train (matches 0124 Path A; equal-token comparison).
-export MAX_WALLCLOCK_SECONDS=3600
+export MAX_WALLCLOCK_SECONDS=10800
