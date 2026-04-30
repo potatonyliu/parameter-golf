@@ -2,8 +2,25 @@
   "id": "0120_dendrocentric_v2",
   "parent": "0117_dendrocentric_v1_n5_ternary",
   "created_at": "2026-04-30T02:16:12Z",
-  "metrics": null,
-  "flags": {},
+  "metrics": {
+    "val_bpb_pre_quant": 1.8921,
+    "val_bpb_post_quant": 1.89784572,
+    "val_loss_pre_quant": 3.2339,
+    "val_loss_post_quant": 3.24366746,
+    "quant_tax": 0.005746,
+    "step_avg_ms": 1549.37,
+    "num_steps": 1000.0,
+    "artifact_bytes": 6178781.0,
+    "artifact_mb": 6.179,
+    "code_bytes": 103098.0,
+    "compression_ratio": 6.35
+  },
+  "flags": {
+    "crashed": false,
+    "size_violation": false,
+    "has_nan": false,
+    "exit_code": 0
+  },
   "status": null,
   "description": null
 }
