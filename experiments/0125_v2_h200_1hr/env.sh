@@ -207,7 +207,7 @@ export DENDRO_TAU_L=1.0
 # ~60 GB / 80 GB per GPU = comfortable.
 # At ~411ms/step (half Round 2's 822ms due to half batch): 3600/0.411 = 8760 steps
 # × 262144 = 2.30B tokens — SAME as Round 2's token budget. Clean comparison.
-export TRAIN_BATCH_TOKENS=262144
+export TRAIN_BATCH_TOKENS=131072
 export ITERATIONS=30000
 # EMA β=0.999 for long-train (window=1000 ≈ 8-12% of 9k-14k steps = late-train).
 export EMA_BETA=0.999
