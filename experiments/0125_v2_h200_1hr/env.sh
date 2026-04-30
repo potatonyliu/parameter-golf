@@ -198,14 +198,16 @@ export DENDRO_K=8
 export DENDRO_ALPHA=4.0
 export DENDRO_TAU_X=1.0
 export DENDRO_TAU_L=1.0
-export TRAIN_BATCH_TOKENS=524288
-# 0125 v2 LONG-TRAIN ROUND 3 on 4×H200 — brief-test at fair token budget.
-# Same training duration as 0124 Path A so v2-vs-Path A comparison is clean
-# (apples-to-apples token budget). Cost: ~$16 at $15.96/hr × 3600s.
-# Predicted: at 9000-14000 steps × 524288 = 4.7-7.3B tokens, with M=1024 K=8
-# DFSM-trained ordering, ordering claim has chance to express itself if it
-# matters. Predicted post-quant val_bpb [Path A − 0.05, Path A + 0.10].
-export ITERATIONS=20000
+# 0125 v2 LONG-TRAIN ROUND 3 — brief-test on 4×H100 80GB SXM (HARDWARE CHANGE
+# from prior plan: original was H200 141GB; new pod is H100 80GB. v2 + Round 2's
+# n=7 stack used 114 GB on H200 at batch 524288 → would OOM on H100 80GB).
+# Drop batch 524288 → 262144 to fit. Per-GPU micro = 262144 / 4 / 2 = 32768 tokens.
+# Gather buffer (32768, 1024, 8) × 2B = 0.5 GB × 21 layers = 10.5 GB. Total VRAM
+# ~60 GB / 80 GB per GPU = comfortable.
+# At ~411ms/step (half Round 2's 822ms due to half batch): 3600/0.411 = 8760 steps
+# × 262144 = 2.30B tokens — SAME as Round 2's token budget. Clean comparison.
+export TRAIN_BATCH_TOKENS=262144
+export ITERATIONS=30000
 # EMA β=0.999 for long-train (window=1000 ≈ 8-12% of 9k-14k steps = late-train).
 export EMA_BETA=0.999
 export EMA_WARMUP_OFFSET=
