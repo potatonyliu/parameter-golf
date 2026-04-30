@@ -171,9 +171,7 @@ export TRAIN_BATCH_TOKENS=131072
 export NUM_UNIQUE_LAYERS=7
 export PARALLEL_LAYER_POSITIONS=0,1,2,3,4,5,6
 
-# Need to extend PARALLEL_LAYER_POSITIONS to cover all 5 unique blocks (0102 had
-# 0,1,2 covering 3 unique blocks; now we have 5).
-export PARALLEL_LAYER_POSITIONS=0,1,2,3,4
+# (n=5 PARALLEL_LAYER_POSITIONS line removed — superseded by n=7 line above)
 
 # 0124 PATH A LONG-TRAIN ROUND 2 on 4×H200 SXM — non-records-track demonstration.
 # Goal: scale Path A SSM stack to records-class token budget. Per scratch/2026-04-29_
