@@ -168,7 +168,7 @@ export TRAIN_BATCH_TOKENS=131072
 # Bump NUM_UNIQUE_LAYERS=5 (5/3 = 1.67× more body params). Predicted artifact:
 # 5.6 MB × 1.67 ≈ 9.3 MB, well under 16 MB cap. Question: does the freed cap from
 # ternary translate to better val when spent on more depth?
-export NUM_UNIQUE_LAYERS=5
+export NUM_UNIQUE_LAYERS=7
 
 # Need to extend PARALLEL_LAYER_POSITIONS to cover all 5 unique blocks (0102 had
 # 0,1,2 covering 3 unique blocks; now we have 5).
